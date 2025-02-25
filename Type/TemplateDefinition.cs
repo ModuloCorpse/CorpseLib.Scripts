@@ -5,7 +5,7 @@ namespace CorpseLib.Scripts.Type
 {
     public class TemplateDefinition
     {
-        private static OperationResult<string[]> SplitTemplate(string template)
+        public static OperationResult<string[]> SplitTemplate(string template)
         {
             List<string> result = [];
             StringBuilder builder = new();
@@ -22,7 +22,8 @@ namespace CorpseLib.Scripts.Type
                     }
                     else if (c == '<')
                         ++templateCount;
-                    builder.Append(c);
+                    if (!char.IsWhiteSpace(c))
+                        builder.Append(c);
                 }
                 else if (c == ',')
                 {
@@ -54,7 +55,7 @@ namespace CorpseLib.Scripts.Type
             int templateIdx = template.IndexOf('<');
             if (templateIdx >= 0)
             {
-                OperationResult<string[]> templatesResult = SplitTemplate(template[(templateIdx + 1)..^1].Replace(" ", ""));
+                OperationResult<string[]> templatesResult = SplitTemplate(template[(templateIdx + 1)..^1]);
                 if (templatesResult && templatesResult.Result != null)
                 {
                     string[] templates = templatesResult.Result;
@@ -71,39 +72,39 @@ namespace CorpseLib.Scripts.Type
 
         private abstract class AAttributeDefinition
         {
-            public abstract string GetName();
-            public abstract override string ToString();
+            public abstract int GetID();
+            public abstract string ToScriptString(ConversionTable conversionTable);
             public abstract Parameter? Instantiate(bool isConst, Dictionary<string, string> templates, Namespace @namespace);
         }
 
         private class ParameterAttributeDefinition(Parameter parameter) : AAttributeDefinition
         {
             private readonly Parameter m_Parameter = parameter;
-            public override string GetName() => m_Parameter.Name;
-            public override string ToString() => m_Parameter.ToString();
+            public override int GetID() => m_Parameter.ID;
+            public override string ToScriptString(ConversionTable conversionTable) => m_Parameter.ToScriptString(conversionTable);
             public override Parameter? Instantiate(bool isConst, Dictionary<string, string> templates, Namespace @namespace) => m_Parameter;
         }
 
         private class TemplateAttributeDefinition : AAttributeDefinition
         {
             private readonly string m_Type;
-            private readonly string m_Name;
+            private readonly int m_ID;
             private readonly string? m_Value = null;
 
             public TemplateAttributeDefinition(string[] parameter)
             {
                 m_Type = parameter[0];
-                m_Name = parameter[1];
+                m_ID = parameter[1].GetHashCode();
                 if (parameter.Length == 3)
                     m_Value = parameter[2];
             }
-            public override string GetName() => m_Name;
-            public override string ToString()
+            public override int GetID() => m_ID;
+            public override string ToScriptString(ConversionTable conversionTable)
             {
                 StringBuilder builder = new();
                 builder.Append(m_Type);
                 builder.Append(' ');
-                builder.Append(m_Name);
+                builder.Append(conversionTable.GetName(m_ID));
                 if (m_Value != null)
                 {
                     builder.Append(" = ");
@@ -152,13 +153,14 @@ namespace CorpseLib.Scripts.Type
                 if (parameterType is VoidType)
                     throw new ArgumentException("Parameter type cannot be void");
                 if (m_Value != null)
-                    return new(parameterType, isConst, m_Name, parameterType.InternalParse(m_Value));
+                    return new(parameterType, isConst, m_ID, parameterType.InternalParse(m_Value));
                 else
-                    return new(parameterType, isConst, m_Name);
+                    return new(parameterType, isConst, m_ID);
             }
 
         }
 
+        //TODO Rework
         private readonly List<AAttributeDefinition> m_Attributes = [];
         private readonly string[] m_Templates;
         private readonly string m_Name;
@@ -171,11 +173,11 @@ namespace CorpseLib.Scripts.Type
             m_Templates = templates;
         }
 
-        private bool SearchAttribute(string name)
+        private bool SearchAttribute(int id)
         {
             foreach (AAttributeDefinition attribute in m_Attributes)
             {
-                if (attribute.GetName() == name)
+                if (attribute.GetID() == id)
                     return true;
             }
             return false;
@@ -183,7 +185,7 @@ namespace CorpseLib.Scripts.Type
 
         internal bool AddAttributeDefinition(Parameter parameter)
         {
-            if (SearchAttribute(parameter.Name))
+            if (SearchAttribute(parameter.ID))
                 return false;
             m_Attributes.Add(new ParameterAttributeDefinition(parameter));
             return true;
@@ -191,7 +193,7 @@ namespace CorpseLib.Scripts.Type
 
         internal bool AddAttributeDefinition(string[] parameter)
         {
-            if (SearchAttribute(parameter[1]))
+            if (SearchAttribute(parameter[1].GetHashCode()))
                 return false;
             m_Attributes.Add(new TemplateAttributeDefinition(parameter));
             return true;
@@ -229,7 +231,7 @@ namespace CorpseLib.Scripts.Type
             return type;
         }
 
-        public override string ToString()
+        public string ToScriptString(ConversionTable conversionTable)
         {
             StringBuilder stringBuilder = new("struct ");
             stringBuilder.Append(Name[..(Name.IndexOf('<') + 1)]);
@@ -245,7 +247,7 @@ namespace CorpseLib.Scripts.Type
             stringBuilder.Append(" { ");
             foreach (AAttributeDefinition attribute in m_Attributes)
             {
-                stringBuilder.Append(attribute.ToString());
+                stringBuilder.Append(attribute.ToScriptString(conversionTable));
                 stringBuilder.Append("; ");
             }
             stringBuilder.Append('}');

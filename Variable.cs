@@ -39,6 +39,21 @@ namespace CorpseLib.Scripts
             }
         }
 
+        public Variable? GetSubValue(int id)
+        {
+            if (m_Value != null && m_Type is ObjectType objectType)
+            {
+                int i = 0;
+                foreach (Parameter parameter in objectType.Attributes)
+                {
+                    if (parameter.ID == id)
+                        return new(parameter.Type, [m_Value[i]], m_IsDefault);
+                    ++i;
+                }
+            }
+            return null;
+        }
+
         public void SetValue(object[]? value)
         {
             m_Value = value;

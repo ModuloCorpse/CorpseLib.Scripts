@@ -4,6 +4,6 @@
     {
         private readonly string m_Instruction = instruction;
         protected override void Execute(Environment env, FunctionStack functionStack) => Console.WriteLine(m_Instruction);
-        public override string ToString() => string.Format("{0};", m_Instruction);
+        public override string ToScriptString(ConversionTable _) => string.Format("{0};", m_Instruction);
     }
 }

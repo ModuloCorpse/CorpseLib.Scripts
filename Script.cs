@@ -2,6 +2,10 @@
 {
     public class Script : Namespace
     {
-        public Script() : base(string.Empty) { }
+        private readonly ConversionTable m_ConversionTable = new();
+
+        public ConversionTable ConversionTable => m_ConversionTable;
+
+        public Script() : base(0) { }
     }
 }

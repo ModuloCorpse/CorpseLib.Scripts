@@ -4,7 +4,7 @@ namespace CorpseLib.Scripts
 {
     public abstract class AVoidFunction : AFunction
     {
-        protected AVoidFunction(string functionName, Parameter[] parameters) : base(new(Types.VOID, functionName, parameters)) { }
+        protected AVoidFunction(string functionName, Parameter[] parameters) : base(new(Types.VOID, functionName.GetHashCode(), parameters)) { }
 
         internal override object? InternalExecute(Environment environment)
         {

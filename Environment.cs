@@ -3,43 +3,30 @@
     public class Environment
     {
         private readonly Environment? m_Parent = null;
-        private readonly Dictionary<string, object?> m_Variables = [];
-        private bool m_HasReturn = false;
+        private readonly Dictionary<int, Variable> m_Variables = [];
 
         public Environment() { }
         public Environment(Environment parent) => m_Parent = parent;
 
-        public void Return()
-        {
-            //TODO Handle value
-            m_HasReturn = true;
-        }
+        public void AddVariable(int id, Variable value) => m_Variables[id] = value;
 
-        public void SetVariable(string name, object? value) => m_Variables[name] = value;
-
-        public object? GetVariable(string name)
+        public Variable? GetVariable(int[] ids)
         {
-            Dictionary<string, object?> variables = m_Variables;
-            string[] param = name.Split('.');
-            for (int i = 0; i != param.Length; ++i)
+            if (ids.Length == 0)
+                return null;
+            if (m_Variables.TryGetValue(ids[0], out var value))
             {
-                if (variables.TryGetValue(param[i], out var value))
+                for (int i = 1; i != ids.Length; ++i)
                 {
-                    if ((i + 1) != param.Length)
-                    {
-                        if (value is Dictionary<string, object?> dict)
-                            variables = dict;
-                        else
-                            return null;
-                    }
+                    Variable? subValue = value.GetSubValue(ids[i]);
+                    if (subValue != null)
+                        value = subValue;
                     else
-                        return value;
+                        return null;
                 }
+                return value;
             }
-            return m_Parent?.GetVariable(name);
+            return m_Parent?.GetVariable(ids);
         }
-
-        public void OpenScope() { }
-        public void CloseScope() { }
     }
 }

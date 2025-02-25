@@ -80,5 +80,17 @@ namespace CorpseLib.Scripts.Type.Primitive
             builder.Append(']');
             return builder.ToString();
         }
+
+        public override bool IsOfType(object[]? value)
+        {
+            if (value == null)
+                return false;
+            foreach (object element in value)
+            {
+                if (!m_ElementType.IsOfType([element]))
+                    return false;
+            }
+            return true;
+        }
     }
 }

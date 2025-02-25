@@ -3,22 +3,21 @@
     public abstract class ATypeInstance
     {
         private readonly Namespace? m_Namespace;
-        private readonly string m_Name;
+        private readonly int m_ID;
 
-        public string Name => m_Name;
+        public int ID => m_ID;
 
-        public string GetFullName()
+        public string GetFullName(ConversionTable conversionTable)
         {
-            string parentName = m_Namespace?.GetName() ?? string.Empty;
-            if (!string.IsNullOrEmpty(parentName))
-                return string.Format("{0}.{1}", parentName, m_Name);
-            return m_Name;
+            if (m_Namespace != null)
+                return string.Format("{0}.{1}", m_Namespace.GetName(conversionTable), conversionTable.GetName(m_ID));
+            return conversionTable.GetName(m_ID);
         }
 
-        internal ATypeInstance(Namespace? @namespace, string name)
+        internal ATypeInstance(Namespace? @namespace, int id)
         {
             m_Namespace = @namespace;
-            m_Name = name;
+            m_ID = id;
         }
 
         internal object[]? InternalParse(string str)
@@ -28,6 +27,7 @@
             return Parse(str);
         }
 
+        public abstract bool IsOfType(object[]? value);
         public abstract object[]? Parse(string str);
         public abstract string ToString(object[]? value);
     }

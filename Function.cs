@@ -10,37 +10,30 @@ namespace CorpseLib.Scripts
         internal override object? InternalExecute(Environment env)
         {
             FunctionStack stack = new();
-            env.OpenScope();
+            Environment functionEnv = new(env);
             foreach (AInstruction instruction in m_Instructions)
             {
                 if (instruction is Break || instruction is Continue)
-                {
-                    env.CloseScope();
                     return new();
-                }
                 else
                 {
-                    instruction.ExecuteInstruction(env, stack);
+                    instruction.ExecuteInstruction(functionEnv, stack);
                     if (stack.HasReturn)
-                    {
-                        env.CloseScope();
                         return new();
-                    }
                 }
             }
-            env.CloseScope();
             return stack.ReturnValue;
         }
 
-        public override string ToString()
+        public string ToScriptString(ConversionTable conversionTable)
         {
             StringBuilder sb = new();
-            sb.Append(Signature.ToString());
+            sb.Append(Signature.ToScriptString(conversionTable));
             sb.Append(" {");
             foreach (AInstruction instruction in m_Instructions)
             {
                 sb.Append(' ');
-                sb.Append(instruction.ToString());
+                sb.Append(instruction.ToScriptString(conversionTable));
             }
             sb.Append(" }");
             return sb.ToString();

@@ -5,6 +5,12 @@ using CorpseLib.Scripts.Instruction;
 
 namespace CorpseLib.Scripts
 {
+    //TODO : Rework how parser work to be able to parse some element after others and parse in order :
+    // - Imports
+    // - namespaces
+    // - struct declarations
+    // - globals
+    // - functions
     public class ScriptParser
     {
         private readonly List<string> m_Warnings = [];
@@ -239,7 +245,7 @@ namespace CorpseLib.Scripts
             return [.. ret];
         }
 
-        private Parameter? ParseParameter(string parameter, Namespace @namespace)
+        private Parameter? ParseParameter(string parameter, Namespace @namespace, ConversionTable conversionTable)
         {
             if (string.IsNullOrEmpty(parameter))
             {
@@ -261,9 +267,9 @@ namespace CorpseLib.Scripts
                 return null;
             }
             if (parameterParts.Length == 3)
-                return new Parameter(parameterType, isConst, parameterParts[1], parameterType.InternalParse(parameterParts[2]));
+                return new Parameter(parameterType, isConst, conversionTable.PushName(parameterParts[1]), parameterType.InternalParse(parameterParts[2]));
             else
-                return new Parameter(parameterType, isConst, parameterParts[1]);
+                return new Parameter(parameterType, isConst, conversionTable.PushName(parameterParts[1]));
         }
 
         private static string[] FunctionSignatureParameterSplit(string content)
@@ -373,7 +379,7 @@ namespace CorpseLib.Scripts
             return [.. result];
         }
 
-        private FunctionSignature? ParseFunctionSignature(string parametersStr, string signatureStr, Namespace @namespace)
+        private FunctionSignature? ParseFunctionSignature(string parametersStr, string signatureStr, Namespace @namespace, ConversionTable conversionTable)
         {
             string[] signatureParts = signatureStr.Split(' ');
             string returnTypeStr;
@@ -404,7 +410,7 @@ namespace CorpseLib.Scripts
                 string[] parametersStrArr = FunctionSignatureParameterSplit(parametersStr);
                 for (int i = 0; i != parametersStrArr.Length; ++i)
                 {
-                    Parameter? result = ParseParameter(parametersStrArr[i], @namespace);
+                    Parameter? result = ParseParameter(parametersStrArr[i], @namespace, conversionTable);
                     if (m_HasErrors)
                         return null;
                     parameters.Add(result!);
@@ -416,7 +422,7 @@ namespace CorpseLib.Scripts
                 RegisterError("Misformated function signature string", string.Format("Unknown return type : {0}", returnTypeStr));
                 return null;
             }
-            return new(returnType, functionName, [.. parameters]);
+            return new(returnType, conversionTable.PushName(functionName), [.. parameters]);
         }
 
         private AInstruction? ParseInstruction(string instruction)
@@ -499,15 +505,15 @@ namespace CorpseLib.Scripts
             if (m_HasErrors)
                 return null;
             IfInstruction ifInstruction = new(keyWordParams.Item1, ifResult);
-            while (str.StartsWith("else if"))
+            while (str.StartsWith("elif"))
             {
-                keyWordParams = ParseKeyword(functionName, "else if", ref str, true);
+                keyWordParams = ParseKeyword(functionName, "elif", ref str, true);
                 if (m_HasErrors)
                     return null;
                 List<AInstruction> elseIfResult = FunctionLoadBody(functionName, keyWordParams.Item2);
                 if (m_HasErrors)
                     return null;
-                ifInstruction.AddElseIf(keyWordParams.Item1, elseIfResult);
+                ifInstruction.AddElif(keyWordParams.Item1, elseIfResult);
             }
             if (str.StartsWith("else"))
             {
@@ -607,7 +613,7 @@ namespace CorpseLib.Scripts
             return instructions;
         }
 
-        private void LoadStructure(string objectTypeName, string structContent, Namespace @namespace)
+        private void LoadStructure(string objectTypeName, string structContent, Namespace @namespace, ConversionTable conversionTable)
         {
             if (!string.IsNullOrEmpty(objectTypeName))
             {
@@ -648,9 +654,9 @@ namespace CorpseLib.Scripts
                                 return;
                             }
                             if (parameterParts.Length == 3)
-                                templateDefinition.AddAttributeDefinition(new Parameter(parameterType, isConst, parameterParts[1], parameterType.InternalParse(parameterParts[2])));
+                                templateDefinition.AddAttributeDefinition(new Parameter(parameterType, isConst, conversionTable.PushName(parameterParts[1]), parameterType.InternalParse(parameterParts[2])));
                             else
-                                templateDefinition.AddAttributeDefinition(new Parameter(parameterType, isConst, parameterParts[1]));
+                                templateDefinition.AddAttributeDefinition(new Parameter(parameterType, isConst, conversionTable.PushName(parameterParts[1])));
                         }
                         else
                         {
@@ -667,17 +673,17 @@ namespace CorpseLib.Scripts
                 }
                 else
                 {
-                    ObjectType structDefinition = new(@namespace, objectTypeName);
+                    ObjectType structDefinition = new(@namespace, conversionTable.PushName(objectTypeName));
                     @namespace.AddType(structDefinition);
                     while (!string.IsNullOrEmpty(structContent))
                     {
                         Tuple<string, string> structAttribute = NextInstruction(structContent, out bool foundAttribute);
                         if (!foundAttribute)
                         {
-                            RegisterError("Invalid script", string.Format("Bad structure definition for {0}", structDefinition.Name));
+                            RegisterError("Invalid script", string.Format("Bad structure definition for {0}", objectTypeName));
                             return;
                         }
-                        Parameter? result = ParseParameter(structAttribute.Item1, @namespace);
+                        Parameter? result = ParseParameter(structAttribute.Item1, @namespace, conversionTable);
                         if (m_HasErrors)
                             return;
                         structDefinition.AddAttribute(result!);
@@ -782,7 +788,7 @@ namespace CorpseLib.Scripts
             return [.. result];
         }
 
-        private void LoadNamespaceContent(Namespace @namespace, string str)
+        private void LoadNamespaceContent(Namespace @namespace, string str, ConversionTable conversionTable)
         {
             while (!string.IsNullOrEmpty(str))
             {
@@ -814,10 +820,11 @@ namespace CorpseLib.Scripts
                         }
                         str = signatureSplit.Item3;
                         //TODO
-                        FunctionSignature? functionSignatureResult = ParseFunctionSignature(signatureSplit.Item2, signatureSplit.Item1[4..], @namespace);
+                        FunctionSignature? functionSignatureResult = ParseFunctionSignature(signatureSplit.Item2, signatureSplit.Item1[4..], @namespace, conversionTable);
                         if (m_HasErrors)
                             return;
                         FunctionSignature functionSignature = functionSignatureResult!;
+                        string functionSignatureName = conversionTable.GetName(functionSignature.ID);
                         Tuple<string, string, string> scoped = IsolateScope(str, '{', '}', out bool found);
                         if (!found)
                         {
@@ -827,13 +834,13 @@ namespace CorpseLib.Scripts
                         str = scoped.Item3;
                         Function function = new(functionSignature);
                         //TODO
-                        List<AInstruction> functionBody = FunctionLoadBody(function.Signature.Name, scoped.Item2);
+                        List<AInstruction> functionBody = FunctionLoadBody(functionSignatureName, scoped.Item2);
                         if (m_HasErrors)
                             return;
                         function.AddInstructions(functionBody);
                         if (!@namespace.AddFunction(function))
                         {
-                            RegisterError("Invalid script", string.Format("Function {0} already exist", function.Signature.Name));
+                            RegisterError("Invalid script", string.Format("Function {0} already exist", functionSignatureName));
                             return;
                         }
                     }
@@ -845,7 +852,7 @@ namespace CorpseLib.Scripts
                             RegisterError("Invalid script", "Bad structure definition");
                             return;
                         }
-                        LoadStructure(scoped.Item1[7..], scoped.Item2, @namespace);
+                        LoadStructure(scoped.Item1[7..], scoped.Item2, @namespace, conversionTable);
                         if (m_HasErrors)
                             return;
                         str = scoped.Item3;
@@ -858,7 +865,7 @@ namespace CorpseLib.Scripts
                             RegisterError("Invalid script", "Bad namespace definition");
                             return;
                         }
-                        LoadNamespace(scoped.Item1[10..], scoped.Item2, @namespace);
+                        LoadNamespace(scoped.Item1[10..], scoped.Item2, @namespace, conversionTable);
                         if (m_HasErrors)
                             return;
                         str = scoped.Item3;
@@ -871,12 +878,12 @@ namespace CorpseLib.Scripts
                             RegisterError("Invalid script", "Bad global definition");
                             return;
                         }
-                        Parameter? global = ParseParameter(instruction.Item1, @namespace);
+                        Parameter? global = ParseParameter(instruction.Item1, @namespace, conversionTable);
                         if (m_HasErrors)
                             return;
                         if (!@namespace.AddGlobal(global!))
                         {
-                            RegisterError("Invalid script", string.Format("Variable {0} already exist", global!.Name));
+                            RegisterError("Invalid script", string.Format("Variable {0} already exist", global!.ID));
                             return;
                         }
                         str = instruction.Item2;
@@ -890,15 +897,15 @@ namespace CorpseLib.Scripts
             }
         }
 
-        private void LoadNamespace(string namespaceName, string namespaceContent, Namespace parent)
+        private void LoadNamespace(string namespaceName, string namespaceContent, Namespace parent, ConversionTable conversionTable)
         {
-            Namespace @namespace = new(namespaceName, parent);
-            LoadNamespaceContent(@namespace, namespaceContent);
+            Namespace @namespace = new(conversionTable.PushName(namespaceName), parent);
+            LoadNamespaceContent(@namespace, namespaceContent, conversionTable);
             if (m_HasErrors)
                 return;
-            if (!parent.AddNamespace(namespaceName, @namespace))
+            if (!parent.AddNamespace(@namespace))
             {
-                RegisterError("Invalid script", string.Format("Namespace {0} already exist", @namespace.GetName()));
+                RegisterError("Invalid script", string.Format("Namespace {0} already exist", @namespace.GetName(conversionTable)));
                 return;
             }
             return;
@@ -1000,8 +1007,8 @@ namespace CorpseLib.Scripts
             }
             Shell.Helper.TrimCommand(ref str);
             Script script = new();
-            //TODO Parse inmports/include
-            LoadNamespaceContent(script, str);
+            //TODO Parse imports/include
+            LoadNamespaceContent(script, str, script.ConversionTable);
             if (m_HasErrors)
                 return null;
             return script;

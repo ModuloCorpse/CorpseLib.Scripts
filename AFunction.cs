@@ -14,7 +14,14 @@
             int i = 0;
             while (i != m_Signature.Parameters.Length)
             {
-
+                Parameter param = m_Signature.Parameters[i];
+                object? paramValue = parameters[i];
+                Variable? argument = null;
+                if (paramValue == null)
+                    argument = param.Instantiate();
+                else if (param.Type.IsOfType([paramValue]))
+                    argument = param.Instantiate([paramValue]);
+                environment.AddVariable(param.ID, argument);
                 //Fill environment with parameters
                 ++i;
             }

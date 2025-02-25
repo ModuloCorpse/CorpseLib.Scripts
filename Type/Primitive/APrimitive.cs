@@ -1,8 +1,15 @@
 ﻿namespace CorpseLib.Scripts.Type.Primitive
 {
-    public abstract class APrimitive<T> : ARawPrimitive
+    public abstract class APrimitive<T>(string name) : ARawPrimitive(name)
     {
-        protected APrimitive(string name) : base(name) { }
+        public override bool IsOfType(object[]? value)
+        {
+            if (value == null || value.Length == 0)
+                return false;
+            else if (Helper.ChangeType(value[0], out T? _))
+                return true;
+            return false;
+        }
 
         public override object[]? Parse(string str) { try { return [ConvertFrom(str)!]; } catch { return null; } }
 
@@ -12,8 +19,11 @@
                 throw new ArgumentException("Primitive has no value");
             if (value.Length == 0)
                 return "null";
-            else if (value[0] is T val)
-                return ConvertTo(val);
+            else
+            {
+                if (Helper.ChangeType(value[0], out T? ret))
+                    return ConvertTo(ret!);
+            }
             throw new ArgumentException("Primitive value is not of the right type");
         }
 

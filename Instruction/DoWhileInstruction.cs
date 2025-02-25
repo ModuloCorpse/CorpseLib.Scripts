@@ -16,31 +16,24 @@ namespace CorpseLib.Scripts.Instruction
         {
             do
             {
-                env.OpenScope();
+                Environment doWhileEnvironment = new(env);
                 foreach (AInstruction instruction in m_Body)
                 {
                     if (instruction is Break)
-                    {
-                        env.CloseScope();
                         return;
-                    }
                     else if (instruction is Continue)
                         break;
                     else
                     {
-                        instruction.ExecuteInstruction(env, functionStack);
+                        instruction.ExecuteInstruction(doWhileEnvironment, functionStack);
                         if (functionStack.HasReturn)
-                        {
-                            env.CloseScope();
                             return;
-                        }
                     }
                 }
-                env.CloseScope();
             } while (EvaluateCondition(env, functionStack, m_Condition));
         }
 
-        public override string ToString()
+        public override string ToScriptString(ConversionTable conversionTable)
         {
             StringBuilder builder = new("do");
             if (m_Body.Count > 1)
@@ -48,7 +41,7 @@ namespace CorpseLib.Scripts.Instruction
             foreach (AInstruction instruction in m_Body)
             {
                 builder.Append(' ');
-                builder.Append(instruction.ToString());
+                builder.Append(instruction.ToScriptString(conversionTable));
             }
             if (m_Body.Count > 1)
                 builder.Append(" }");

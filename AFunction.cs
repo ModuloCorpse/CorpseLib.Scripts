@@ -10,7 +10,7 @@
 
         internal object? Call(object?[] parameters)
         {
-            Environment environment = new();
+            Frame frame = new();
             int i = 0;
             while (i != m_Signature.Parameters.Length)
             {
@@ -21,17 +21,17 @@
                     argument = param.Instantiate();
                 else if (param.Type.IsOfType([paramValue]))
                     argument = param.Instantiate([paramValue]);
-                environment.AddVariable(param.ID, argument);
-                //Fill environment with parameters
+                frame.AddVariable(param.ID, argument!);
+                //Fill frame with parameters
                 ++i;
             }
             if (i > parameters.Length)
             {
                 return null;
             }
-            return InternalExecute(environment);
+            return InternalExecute(frame);
         }
 
-        internal abstract object? InternalExecute(Environment environment);
+        internal abstract object? InternalExecute(Frame frame);
     }
 }

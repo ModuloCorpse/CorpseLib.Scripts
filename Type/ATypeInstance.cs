@@ -2,22 +2,13 @@
 {
     public abstract class ATypeInstance
     {
-        private readonly Namespace? m_Namespace;
-        private readonly int m_ID;
+        private readonly TypeInfo? m_TypeInfo;
 
-        public int ID => m_ID;
+        public TypeInfo TypeInfo => m_TypeInfo!;
 
-        public string GetFullName(ConversionTable conversionTable)
+        internal ATypeInstance(TypeInfo? typeInfo)
         {
-            if (m_Namespace != null)
-                return string.Format("{0}.{1}", m_Namespace.GetName(conversionTable), conversionTable.GetName(m_ID));
-            return conversionTable.GetName(m_ID);
-        }
-
-        internal ATypeInstance(Namespace? @namespace, int id)
-        {
-            m_Namespace = @namespace;
-            m_ID = id;
+            m_TypeInfo = typeInfo;
         }
 
         internal object[]? InternalParse(string str)

@@ -2,13 +2,12 @@
 {
     public abstract class AInstruction
     {
-        internal void ExecuteInstruction(Environment env, FunctionStack instructionStack)
+        internal void ExecuteInstruction(Frame frame, FunctionStack instructionStack)
         {
-            Environment executionEnv = new(env);
-            Execute(executionEnv, instructionStack);
+            Frame executionFrame = new(frame);
+            Execute(executionFrame, instructionStack);
         }
 
-        protected abstract void Execute(Environment env, FunctionStack instructionStack);
-        public abstract string ToScriptString(ConversionTable conversionTable);
+        protected abstract void Execute(Frame frame, FunctionStack instructionStack);
     }
 }

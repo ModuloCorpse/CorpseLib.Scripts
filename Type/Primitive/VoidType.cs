@@ -2,7 +2,7 @@
 {
     public class VoidType : ARawPrimitive
     {
-        public VoidType() : base("void") { }
+        public VoidType() : base() { }
 
         public override bool IsOfType(object[]? value) => false;
 

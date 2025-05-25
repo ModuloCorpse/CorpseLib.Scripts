@@ -245,17 +245,80 @@ namespace CorpseLib.Scripts
             return [.. ret];
         }
 
-        private Parameter? ParseParameter(string parameter, Namespace @namespace, ConversionTable conversionTable)
+        private static OperationResult<int[]> SplitTemplate(string template, ConversionTable conversionTable)
+        {
+            List<int> result = [];
+            StringBuilder builder = new();
+            int templateCount = 0;
+            foreach (char c in template)
+            {
+                if (templateCount != 0)
+                {
+                    if (c == '>')
+                    {
+                        --templateCount;
+                        if (templateCount < 0)
+                            return new("Template error", string.Format("Bad template {0}", template));
+                    }
+                    else if (c == '<')
+                        ++templateCount;
+                    if (!char.IsWhiteSpace(c))
+                        builder.Append(c);
+                }
+                else if (c == ',')
+                {
+                    if (builder.Length > 0)
+                    {
+                        result.Add(conversionTable.PushName(builder.ToString()));
+                        builder.Clear();
+                    }
+                    else
+                        return new("Template error", string.Format("Bad template {0}", template));
+                }
+                else if (c == '<')
+                {
+                    ++templateCount;
+                    builder.Append(c);
+                }
+                else if (c == '>')
+                    return new("Template error", string.Format("Bad template {0}", template));
+                else if (!char.IsWhiteSpace(c))
+                    builder.Append(c);
+            }
+            if (builder.Length > 0)
+                result.Add(conversionTable.PushName(builder.ToString()));
+            return new([.. result]);
+        }
+
+        private static OperationResult<Tuple<int, int[]>> ExtractTypeName(string template, ConversionTable conversionTable)
+        {
+            int templateIdx = template.IndexOf('<');
+            if (templateIdx >= 0)
+            {
+                OperationResult<int[]> templatesResult = SplitTemplate(template[(templateIdx + 1)..^1], conversionTable);
+                if (templatesResult && templatesResult.Result != null)
+                {
+                    int[] templateTypesIDs = templatesResult.Result;
+                    string templateName = template[..templateIdx];
+                    return new(new(conversionTable.PushName(templateName), templateTypesIDs));
+                }
+                return new(templatesResult.Error, templatesResult.Description);
+            }
+            return new(new(conversionTable.PushName(template), []));
+        }
+
+        private Parameter? ParseParameter(string parameter, Environment env, ConversionTable conversionTable)
         {
             if (string.IsNullOrEmpty(parameter))
             {
                 RegisterError("Misformated parameter string", "Empty parameter");
                 return null;
             }
+            //TODO : Do not loose constness (Maybe use a TypeInfo)
             string[] parameterParts = SplitParameter(parameter, out bool isConst);
             if (m_HasErrors)
                 return null;
-            ATypeInstance? parameterType = @namespace.Instantiate(parameterParts[0]);
+            ATypeInstance? parameterType = env.Instantiate(parameterParts[0], conversionTable);
             if (parameterType == null)
             {
                 RegisterError("Unknown parameter type", parameterParts[0]);
@@ -379,11 +442,10 @@ namespace CorpseLib.Scripts
             return [.. result];
         }
 
-        private FunctionSignature? ParseFunctionSignature(string parametersStr, string signatureStr, Namespace @namespace, ConversionTable conversionTable)
+        private FunctionSignature? ParseFunctionSignature(string parametersStr, string signatureStr, Environment env, ConversionTable conversionTable, out string functionName)
         {
             string[] signatureParts = signatureStr.Split(' ');
             string returnTypeStr;
-            string functionName;
             switch (signatureParts.Length)
             {
                 case 1:
@@ -401,6 +463,7 @@ namespace CorpseLib.Scripts
                 default:
                 {
                     RegisterError("Misformated function signature string", string.Format("Bad signature : {0}", parametersStr));
+                    functionName = string.Empty;
                     return null;
                 }
             }
@@ -410,13 +473,13 @@ namespace CorpseLib.Scripts
                 string[] parametersStrArr = FunctionSignatureParameterSplit(parametersStr);
                 for (int i = 0; i != parametersStrArr.Length; ++i)
                 {
-                    Parameter? result = ParseParameter(parametersStrArr[i], @namespace, conversionTable);
+                    Parameter? result = ParseParameter(parametersStrArr[i], env, conversionTable);
                     if (m_HasErrors)
                         return null;
                     parameters.Add(result!);
                 }
             }
-            ATypeInstance? returnType = @namespace.Instantiate(returnTypeStr);
+            ATypeInstance? returnType = env.Instantiate(returnTypeStr, conversionTable);
             if (returnType == null)
             {
                 RegisterError("Misformated function signature string", string.Format("Unknown return type : {0}", returnTypeStr));
@@ -496,6 +559,12 @@ namespace CorpseLib.Scripts
             }
         }
 
+        private Condition ParseCondition(string condition)
+        {
+            //TODO
+            return new Condition(condition);
+        }
+
         private IfInstruction? LoadIf(string functionName, ref string str)
         {
             Tuple<string, string> keyWordParams = ParseKeyword(functionName, "if", ref str, true);
@@ -504,7 +573,7 @@ namespace CorpseLib.Scripts
             List<AInstruction> ifResult = FunctionLoadBody(functionName, keyWordParams.Item2);
             if (m_HasErrors)
                 return null;
-            IfInstruction ifInstruction = new(keyWordParams.Item1, ifResult);
+            IfInstruction ifInstruction = new(ParseCondition(keyWordParams.Item1), ifResult);
             while (str.StartsWith("elif"))
             {
                 keyWordParams = ParseKeyword(functionName, "elif", ref str, true);
@@ -513,7 +582,7 @@ namespace CorpseLib.Scripts
                 List<AInstruction> elseIfResult = FunctionLoadBody(functionName, keyWordParams.Item2);
                 if (m_HasErrors)
                     return null;
-                ifInstruction.AddElif(keyWordParams.Item1, elseIfResult);
+                ifInstruction.AddElif(ParseCondition(keyWordParams.Item1), elseIfResult);
             }
             if (str.StartsWith("else"))
             {
@@ -553,7 +622,7 @@ namespace CorpseLib.Scripts
                     List<AInstruction> whileBody = FunctionLoadBody(functionName, keyWordParams.Item2);
                     if (m_HasErrors)
                         return [];
-                    instructions.Add(new WhileInstruction(keyWordParams.Item1, whileBody));
+                    instructions.Add(new WhileInstruction(ParseCondition(keyWordParams.Item1), whileBody));
                 }
                 else if (body.StartsWith("do"))
                 {
@@ -569,7 +638,7 @@ namespace CorpseLib.Scripts
                         if (found)
                         {
                             body = tuple.Item3;
-                            instructions.Add(new DoWhileInstruction(tuple.Item2, doBody));
+                            instructions.Add(new DoWhileInstruction(ParseCondition(tuple.Item2), doBody));
                         }
                         else
                         {
@@ -591,7 +660,7 @@ namespace CorpseLib.Scripts
                     List<AInstruction> forBody = FunctionLoadBody(functionName, keyWordParams.Item2);
                     if (m_HasErrors)
                         return [];
-                    //instructions.Add(new WhileInstruction(keyWordParams.Item1, forBody));
+                    //TODO
                     RegisterError("Not Supported Yet", "For not supported yet, please use while for now");
                     return [];
                 }
@@ -613,39 +682,39 @@ namespace CorpseLib.Scripts
             return instructions;
         }
 
-        private void LoadStructure(string objectTypeName, string structContent, Namespace @namespace, ConversionTable conversionTable)
+        private void LoadStructure(string objectTypeName, string structContent, Environment env, ConversionTable conversionTable)
         {
             if (!string.IsNullOrEmpty(objectTypeName))
             {
                 if (objectTypeName.Contains('<'))
                 {
-                    OperationResult<Tuple<string, string[]>> tupleResult = TemplateDefinition.ExtractTypeName(objectTypeName);
+                    OperationResult<Tuple<int, int[]>> tupleResult = ExtractTypeName(objectTypeName, conversionTable);
                     if (!tupleResult)
                     {
                         RegisterError(tupleResult.Error, tupleResult.Description);
                         return;
                     }
-                    string templateName = tupleResult.Result!.Item1;
-                    string[] templateTypes = tupleResult.Result!.Item2;
+                    int templateName = tupleResult.Result!.Item1;
+                    int[] templateTypes = tupleResult.Result!.Item2;
                     if (templateTypes.Length == 0)
                     {
                         RegisterError("Invalid template", "No template given");
                         return;
                     }
                     TemplateDefinition templateDefinition = new(templateName, templateTypes);
-                    @namespace.AddTemplateDefinition(templateDefinition);
+                    env.AddTemplateDefinition(templateDefinition);
                     while (!string.IsNullOrEmpty(structContent))
                     {
                         Tuple<string, string> structAttribute = NextInstruction(structContent, out bool foundAttribute);
                         if (!foundAttribute)
                         {
-                            RegisterError("Invalid script", string.Format("Bad structure definition for {0}", templateDefinition.Name));
+                            RegisterError("Invalid script", string.Format("Bad structure definition for {0}", templateName));
                             return;
                         }
                         string[] parameterParts = SplitParameter(structAttribute.Item1, out bool isConst);
                         if (m_HasErrors)
                             return;
-                        ATypeInstance? parameterType = @namespace.Instantiate(parameterParts[0]);
+                        ATypeInstance? parameterType = env.Instantiate(parameterParts[0], conversionTable);
                         if (parameterType != null)
                         {
                             if (parameterType is VoidType)
@@ -661,10 +730,20 @@ namespace CorpseLib.Scripts
                         else
                         {
                             if (parameterParts.Length == 2 || parameterParts.Length == 3)
-                                templateDefinition.AddAttributeDefinition(parameterParts);
+                            {
+                                OperationResult<TypeInfo> attributeTypeInfo = TypeInfo.ParseStr(parameterParts[0], conversionTable);
+                                if (!attributeTypeInfo)
+                                {
+                                    RegisterError(attributeTypeInfo.Error, attributeTypeInfo.Description);
+                                    return;
+                                }
+                                int nameID = conversionTable.PushName(parameterParts[1]);
+                                string? value = (parameterParts.Length == 3) ? parameterParts[2] : null;
+                                templateDefinition.AddAttributeDefinition(attributeTypeInfo.Result!, nameID, value);
+                            }
                             else
                             {
-                                RegisterError("Invalid script", string.Format("Bad structure definition for {0}", templateDefinition.Name));
+                                RegisterError("Invalid script", string.Format("Bad structure definition for {0}", templateName));
                                 return;
                             }
                         }
@@ -673,8 +752,17 @@ namespace CorpseLib.Scripts
                 }
                 else
                 {
-                    ObjectType structDefinition = new(@namespace, conversionTable.PushName(objectTypeName));
-                    @namespace.AddType(structDefinition);
+                    OperationResult<TypeInfo> objectTypeTypeInfo = TypeInfo.ParseStr(objectTypeName, conversionTable);
+                    if (!objectTypeTypeInfo)
+                    {
+                        RegisterError(objectTypeTypeInfo.Error, objectTypeTypeInfo.Description);
+                        return;
+                    }
+                    TypeInfo typeInfo = objectTypeTypeInfo.Result!;
+                    int[] namespaceIDs = (env is Namespace @namespace) ? @namespace.IDS : [];
+                    TypeInfo realTypeInfo = new(typeInfo.IsConst, namespaceIDs, typeInfo.ID, typeInfo.TemplateTypes, typeInfo.IsArray);
+                    ObjectType structDefinition = new(realTypeInfo);
+                    env.AddType(structDefinition);
                     while (!string.IsNullOrEmpty(structContent))
                     {
                         Tuple<string, string> structAttribute = NextInstruction(structContent, out bool foundAttribute);
@@ -683,7 +771,7 @@ namespace CorpseLib.Scripts
                             RegisterError("Invalid script", string.Format("Bad structure definition for {0}", objectTypeName));
                             return;
                         }
-                        Parameter? result = ParseParameter(structAttribute.Item1, @namespace, conversionTable);
+                        Parameter? result = ParseParameter(structAttribute.Item1, env, conversionTable);
                         if (m_HasErrors)
                             return;
                         structDefinition.AddAttribute(result!);
@@ -788,7 +876,7 @@ namespace CorpseLib.Scripts
             return [.. result];
         }
 
-        private void LoadNamespaceContent(Namespace @namespace, string str, ConversionTable conversionTable)
+        private void LoadNamespaceContent(Environment @namespace, string str, ConversionTable conversionTable)
         {
             while (!string.IsNullOrEmpty(str))
             {
@@ -820,11 +908,10 @@ namespace CorpseLib.Scripts
                         }
                         str = signatureSplit.Item3;
                         //TODO
-                        FunctionSignature? functionSignatureResult = ParseFunctionSignature(signatureSplit.Item2, signatureSplit.Item1[4..], @namespace, conversionTable);
+                        FunctionSignature? functionSignatureResult = ParseFunctionSignature(signatureSplit.Item2, signatureSplit.Item1[4..], @namespace, conversionTable, out string functionSignatureName);
                         if (m_HasErrors)
                             return;
                         FunctionSignature functionSignature = functionSignatureResult!;
-                        string functionSignatureName = conversionTable.GetName(functionSignature.ID);
                         Tuple<string, string, string> scoped = IsolateScope(str, '{', '}', out bool found);
                         if (!found)
                         {
@@ -897,15 +984,18 @@ namespace CorpseLib.Scripts
             }
         }
 
-        private void LoadNamespace(string namespaceName, string namespaceContent, Namespace parent, ConversionTable conversionTable)
+        private void LoadNamespace(string namespaceName, string namespaceContent, Environment env, ConversionTable conversionTable)
         {
+            Namespace? parent = (env is Namespace namespc) ? namespc : null;
             Namespace @namespace = new(conversionTable.PushName(namespaceName), parent);
             LoadNamespaceContent(@namespace, namespaceContent, conversionTable);
             if (m_HasErrors)
                 return;
-            if (!parent.AddNamespace(@namespace))
+            if (!env.AddNamespace(@namespace))
             {
-                RegisterError("Invalid script", string.Format("Namespace {0} already exist", @namespace.GetName(conversionTable)));
+                StringBuilder sb = new();
+                ScriptWriter.AppendNamespaceName(ref sb, @namespace, conversionTable);
+                RegisterError("Invalid script", string.Format("Namespace {0} already exist", sb.ToString()));
                 return;
             }
             return;

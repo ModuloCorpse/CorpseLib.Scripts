@@ -1,0 +1,8 @@
+﻿namespace CorpseLib.Scripts.Instruction
+{
+    public class Condition(string condition)
+    {
+        private readonly string m_Condition = condition;
+        public string ConditionStr => m_Condition;
+    }
+}

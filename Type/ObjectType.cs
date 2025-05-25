@@ -2,7 +2,7 @@
 
 namespace CorpseLib.Scripts.Type
 {
-    public class ObjectType(Namespace @namespace, int id) : ATypeInstance(@namespace, id)
+    public class ObjectType(TypeInfo typeInfo) : ATypeInstance(typeInfo)
     {
         private readonly List<Parameter> m_Attributes = [];
 
@@ -119,20 +119,6 @@ namespace CorpseLib.Scripts.Type
                 builder.Append(' ');
             builder.Append('}');
             return builder.ToString();
-        }
-
-        public string ToScriptString(ConversionTable conversionTable)
-        {
-            StringBuilder stringBuilder = new("struct ");
-            stringBuilder.Append(conversionTable.GetName(ID));
-            stringBuilder.Append(" { ");
-            foreach (Parameter attribute in m_Attributes)
-            {
-                stringBuilder.Append(attribute.ToScriptString(conversionTable));
-                stringBuilder.Append("; ");
-            }
-            stringBuilder.Append('}');
-            return stringBuilder.ToString();
         }
 
         public override bool IsOfType(object[]? value)

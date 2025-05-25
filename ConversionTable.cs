@@ -1,12 +1,16 @@
-﻿namespace CorpseLib.Scripts
+﻿using System.Collections;
+
+namespace CorpseLib.Scripts
 {
-    public class ConversionTable
+    public class ConversionTable : IEnumerable<KeyValuePair<int, string>>
     {
         private readonly Dictionary<int, string> m_Table = [];
 
+        internal static int ConvertStr(string str) => str.GetHashCode();
+
         public int PushName(string name)
         {
-            int id = name.GetHashCode();
+            int id = ConvertStr(name);
             m_Table[id] = name;
             return id;
         }
@@ -17,5 +21,8 @@
                 return name;
             return string.Empty;
         }
+
+        public IEnumerator<KeyValuePair<int, string>> GetEnumerator() => m_Table.GetEnumerator();
+        IEnumerator IEnumerable.GetEnumerator() => ((IEnumerable)m_Table).GetEnumerator();
     }
 }

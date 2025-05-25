@@ -1,6 +1,6 @@
 ﻿namespace CorpseLib.Scripts.Type.Primitive
 {
-    public abstract class APrimitive<T>(string name) : ARawPrimitive(name)
+    public abstract class APrimitive<T>() : ARawPrimitive()
     {
         public override bool IsOfType(object[]? value)
         {
@@ -33,76 +33,76 @@
 
     public class BoolType : APrimitive<bool>
     {
-        public BoolType() : base("bool") { }
+        public BoolType() : base() { }
         protected override bool ConvertFrom(string str) => (str == "true");
         protected override string ConvertTo(bool value) => (value) ? "true" : "false";
     }
 
     public class ShortType : APrimitive<short>
     {
-        public ShortType() : base("short") { }
+        public ShortType() : base() { }
         protected override short ConvertFrom(string str) => short.Parse(str);
     }
 
     public class UShortType : APrimitive<ushort>
     {
-        public UShortType() : base("ushort") { }
+        public UShortType() : base() { }
         protected override ushort ConvertFrom(string str) => ushort.Parse(str);
     }
 
     public class CharType : APrimitive<sbyte>
     {
-        public CharType() : base("char") { }
+        public CharType() : base() { }
         protected override sbyte ConvertFrom(string str) => sbyte.Parse(str);
         protected override string ConvertTo(sbyte value) => string.Format("{0}", (char)value);
     }
 
     public class UCharType : APrimitive<byte>
     {
-        public UCharType() : base("uchar") { }
+        public UCharType() : base() { }
         protected override byte ConvertFrom(string str) => byte.Parse(str);
         protected override string ConvertTo(byte value) => string.Format("{0}", (char)value);
     }
 
     public class IntType : APrimitive<int>
     {
-        public IntType() : base("int") { }
+        public IntType() : base() { }
         protected override int ConvertFrom(string str) => int.Parse(str);
     }
 
     public class UIntType : APrimitive<uint>
     {
-        public UIntType() : base("uint") { }
+        public UIntType() : base() { }
         protected override uint ConvertFrom(string str) => uint.Parse(str);
     }
 
     public class LongType : APrimitive<long>
     {
-        public LongType() : base("long") { }
+        public LongType() : base() { }
         protected override long ConvertFrom(string str) => long.Parse(str);
     }
 
     public class ULongType : APrimitive<ulong>
     {
-        public ULongType() : base("ulong") { }
+        public ULongType() : base() { }
         protected override ulong ConvertFrom(string str) => ulong.Parse(str);
     }
 
     public class FloatType : APrimitive<float>
     {
-        public FloatType() : base("float") { }
+        public FloatType() : base() { }
         protected override float ConvertFrom(string str) => float.Parse(str);
     }
 
     public class DoubleType : APrimitive<double>
     {
-        public DoubleType() : base("double") { }
+        public DoubleType() : base() { }
         protected override double ConvertFrom(string str) => double.Parse(str);
     }
 
     public class StringType : APrimitive<string>
     {
-        public StringType() : base("string") { }
+        public StringType() : base() { }
         protected override string ConvertFrom(string str)
         {
             if (str.Length > 0 && str[0] == '"')

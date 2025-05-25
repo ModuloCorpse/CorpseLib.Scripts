@@ -1,7 +1,6 @@
 ﻿namespace CorpseLib.Scripts.Type.Primitive
 {
-    public abstract class ARawPrimitive : ATypeInstance
+    public abstract class ARawPrimitive() : ATypeInstance(null)
     {
-        protected ARawPrimitive(string name) : base(null, name) { }
     }
 }

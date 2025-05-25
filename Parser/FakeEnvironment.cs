@@ -12,7 +12,7 @@ namespace CorpseLib.Scripts.Parser
 
         public void AddVariableType(string name, ATypeInstance value) => m_Variables[name] = value;
 
-        public ATypeInstance? GetVariableType(string name)
+        public ATypeInstance? GetVariableType(string name, ConversionTable conversionTable)
         {
             if (string.IsNullOrWhiteSpace(name))
                 return null;
@@ -26,7 +26,7 @@ namespace CorpseLib.Scripts.Parser
                         bool hasFoundAttribute = false;
                         foreach (Parameter parameter in objectType.Attributes)
                         {
-                            if (parameter.ID == name)
+                            if (parameter.ID == conversionTable.PushName(name))
                             {
                                 type = parameter.Type;
                                 hasFoundAttribute = true;
@@ -40,7 +40,7 @@ namespace CorpseLib.Scripts.Parser
                 }
                 return type;
             }
-            return m_Parent?.GetVariableType(name);
+            return m_Parent?.GetVariableType(name, conversionTable);
         }
     }
 }

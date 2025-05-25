@@ -2,16 +2,14 @@
 
 namespace CorpseLib.Scripts
 {
-    public abstract class AVoidFunction : AFunction
+    public abstract class AVoidFunction(FunctionSignature signature) : AFunction((signature.ReturnType == Types.VOID) ? signature : throw new ArgumentException("The signature must have a return type of void"))
     {
-        protected AVoidFunction(string functionName, Parameter[] parameters) : base(new(Types.VOID, functionName.GetHashCode(), parameters)) { }
-
-        internal override object? InternalExecute(Environment environment)
+        internal override object? InternalExecute(Frame frame)
         {
-            Execute(environment);
+            Execute(frame);
             return new();
         }
 
-        protected abstract void Execute(Environment environment);
+        protected abstract void Execute(Frame frame);
     }
 }

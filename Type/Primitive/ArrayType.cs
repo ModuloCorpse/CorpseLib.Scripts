@@ -8,7 +8,7 @@ namespace CorpseLib.Scripts.Type.Primitive
 
         public ATypeInstance ElementType => m_ElementType;
 
-        internal ArrayType(ATypeInstance arrayType) : base(arrayType.Name + "[]") => m_ElementType = arrayType;
+        internal ArrayType(ATypeInstance arrayType) : base() => m_ElementType = arrayType;
 
         private static string[] SplitArray(string str)
         {

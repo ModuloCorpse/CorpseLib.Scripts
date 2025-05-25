@@ -36,17 +36,5 @@ namespace CorpseLib.Scripts
 
         public override bool Equals(object? obj) => obj is Parameter parameter && m_Type == parameter.m_Type && m_ID == parameter.m_ID && m_DefaultValue == parameter.m_DefaultValue;
         public override int GetHashCode() => HashCode.Combine(m_Type, m_ID, m_DefaultValue);
-        public string ToScriptString(ConversionTable conversionTable)
-        {
-            if (m_IsConst)
-            {
-                if (m_DefaultValue == null)
-                    return string.Format("const {0} {1}", m_Type.GetFullName(conversionTable), conversionTable.GetName(m_ID));
-                return string.Format("const {0} {1} = {2}", m_Type.GetFullName(conversionTable), conversionTable.GetName(m_ID), m_Type.ToString(m_DefaultValue));
-            }
-            if (m_DefaultValue == null)
-                return string.Format("{0} {1}", m_Type.GetFullName(conversionTable), conversionTable.GetName(m_ID));
-            return string.Format("{0} {1} = {2}", m_Type.GetFullName(conversionTable), conversionTable.GetName(m_ID), m_Type.ToString(m_DefaultValue));
-        }
     }
 }

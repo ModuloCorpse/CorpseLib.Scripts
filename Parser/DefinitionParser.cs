@@ -185,21 +185,21 @@ namespace CorpseLib.Scripts.Parser
                     }
                     else
                     {
-                        Tuple<string, string> instruction = NextInstruction(str, out bool found);
+                        /*Tuple<string, string> instruction = NextInstruction(str, out bool found);
                         if (!found)
                         {
                             RegisterError("Invalid script", "Bad global definition");
                             return;
                         }
                         Parameter? global = ParseParameter(instruction.Item1, @namespace);
-                        if (m_HasErrors)
+                        if (HasError)
                             return;
                         if (!@namespace.AddGlobal(global!))
                         {
                             RegisterError("Invalid script", string.Format("Variable {0} already exist", global!.ID));
                             return;
                         }
-                        str = instruction.Item2;
+                        str = instruction.Item2;*/
                     }
                 }
                 else

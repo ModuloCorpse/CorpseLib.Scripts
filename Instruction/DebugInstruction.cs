@@ -3,7 +3,7 @@
     public class DebugInstruction(string instruction) : AInstruction
     {
         private readonly string m_Instruction = instruction;
-        protected override void Execute(Environment env, FunctionStack functionStack) => Console.WriteLine(m_Instruction);
-        public override string ToScriptString(ConversionTable _) => string.Format("{0};", m_Instruction);
+        public string Instruction => m_Instruction;
+        protected override void Execute(Frame frame, FunctionStack functionStack) => Console.WriteLine(m_Instruction);
     }
 }

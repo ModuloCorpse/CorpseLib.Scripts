@@ -11,15 +11,14 @@
             m_TypeInfo = typeInfo;
         }
 
-        internal object[]? InternalParse(string str)
+        internal object[]? InternalConvert(object[] value)
         {
-            if (str == "null")
+            if (value.Length == 0)
                 return [];
-            return Parse(str);
+            return Convert(value);
         }
 
         public abstract bool IsOfType(object[]? value);
-        public abstract object[]? Parse(string str);
-        public abstract string ToString(object[]? value);
+        public abstract object[]? Convert(object[] str);
     }
 }

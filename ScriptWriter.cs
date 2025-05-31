@@ -1,14 +1,79 @@
-﻿using CorpseLib.Scripts.Instruction;
+﻿using CorpseLib.Scripts.Context;
+using CorpseLib.Scripts.Instruction;
 using CorpseLib.Scripts.Type;
 using CorpseLib.Scripts.Type.Primitive;
-using System.Reflection;
 using System.Text;
-using static CorpseLib.Scripts.Type.TemplateDefinition;
+using static CorpseLib.Scripts.Context.TypeDefinition;
 
 namespace CorpseLib.Scripts
 {
     public static class ScriptWriter
     {
+        public static void AppendValue(ref StringBuilder sb, ATypeInstance typeInstance, object[]? value)
+        {
+            if (value == null || typeInstance is VoidType)
+                return;
+            if (value.Length == 0)
+            {
+                sb.Append("null");
+                return;
+            }
+            else if (typeInstance is ArrayType arrayType)
+            {
+                sb.Append('[');
+                for (int i = 0; i != value.Length; ++i)
+                {
+                    if (i != 0)
+                        sb.Append(',');
+                    sb.Append(' ');
+                    if (value[i] is Variable var)
+                        AppendValue(ref sb, arrayType.ElementType, var.Values);
+                    else
+                        throw new ArgumentException("Array is not valid");
+                }
+                if (value.Length != 0)
+                    sb.Append(' ');
+                sb.Append(']');
+            }
+            else if (typeInstance is ObjectType objectType)
+            {
+                sb.Append('{');
+                for (int i = 0; i != value.Length; ++i)
+                {
+                    if (value[i] is Variable var)
+                    {
+                        if (!var.IsDefault())
+                        {
+                            if (i != 0)
+                                sb.Append(',');
+                            sb.Append(' ');
+                            AppendValue(ref sb, var.Type, var.Values);
+                        }
+                    }
+                    else
+                        throw new ArgumentException("Object is not valid");
+                }
+                if (value.Length != 0)
+                    sb.Append(' ');
+                sb.Append('}');
+            }
+            else if (typeInstance is ARawPrimitive && value.Length == 1)
+            {
+                object tmp = value[0];
+                if (typeInstance is StringType)
+                    sb.Append('"').Append(tmp).Append('"');
+                else if (typeInstance is BoolType && Helper.ChangeType(tmp, out bool b))
+                    sb.Append(b ? "true" : "false");
+                //Using byte and sbyte to implicitly convert string to char
+                else if (typeInstance is CharType && Helper.ChangeType(tmp, out sbyte sB))
+                    sb.Append((char)sB);
+                else if (typeInstance is UCharType && Helper.ChangeType(tmp, out byte c))
+                    sb.Append((char)c);
+                else
+                    sb.Append(tmp);
+            }
+        }
+
         private static void AppendParameter(ref StringBuilder sb, Parameter parameter, ConversionTable conversionTable)
         {
             if (parameter.IsConst)
@@ -19,7 +84,7 @@ namespace CorpseLib.Scripts
             if (parameter.DefaultValues != null)
             {
                 sb.Append(" = ");
-                sb.Append(parameter.Type.ToString(parameter.DefaultValues));
+                AppendValue(ref sb, parameter.Type, parameter.DefaultValues);
             }
         }
 
@@ -93,12 +158,15 @@ namespace CorpseLib.Scripts
             sb.Append(')');
         }
 
-        public static void AppendTemplateDefinitionName(ref StringBuilder sb, TemplateDefinition templateDefinition, ConversionTable conversionTable)
+        public static void AppendTypeDefinitionName(ref StringBuilder sb, TypeDefinition typeDefinition, ConversionTable conversionTable)
         {
-            sb.Append(conversionTable.GetName(templateDefinition.ID));
+            sb.Append(conversionTable.GetName(typeDefinition.ID));
+            int[] templates = typeDefinition.Templates;
+            if (templates.Length == 0)
+                return;
             sb.Append('<');
             int i = 0;
-            foreach (int template in templateDefinition.Templates)
+            foreach (int template in templates)
             {
                 if (i != 0)
                     sb.Append(", ");
@@ -135,25 +203,20 @@ namespace CorpseLib.Scripts
                 sb.Append("[]");
         }
 
-        public static void AppendTemplateDefinition(ref StringBuilder sb, TemplateDefinition templateDefinition, ConversionTable conversionTable)
+        public static void AppendTypeDefinition(ref StringBuilder sb, TypeDefinition typeDefinition, ConversionTable conversionTable)
         {
             sb.Append("struct ");
-            AppendTemplateDefinitionName(ref sb, templateDefinition, conversionTable);
+            AppendTypeDefinitionName(ref sb, typeDefinition, conversionTable);
             sb.Append(" { ");
-            foreach (AAttributeDefinition attribute in templateDefinition.Attributes)
+            foreach (AAttributeDefinition attribute in typeDefinition.Attributes)
             {
-                if (attribute is ParameterAttributeDefinition parameterAttributeDefinition)
-                    AppendParameter(ref sb, parameterAttributeDefinition.Parameter, conversionTable);
-                else if (attribute is TemplateAttributeDefinition templateAttributeDefinition)
+                AppendTypeInfo(ref sb, attribute.TypeInfo, conversionTable);
+                sb.Append(' ');
+                sb.Append(conversionTable.GetName(attribute.ID));
+                if (attribute.Value != null)
                 {
-                    AppendTypeInfo(ref sb, templateAttributeDefinition.TypeInfo, conversionTable);
-                    sb.Append(' ');
-                    sb.Append(conversionTable.GetName(templateAttributeDefinition.GetNameID()));
-                    if (templateAttributeDefinition.Value != null)
-                    {
-                        sb.Append(" = ");
-                        sb.Append(templateAttributeDefinition.Value);
-                    }
+                    sb.Append(" = ");
+                    sb.Append(attribute.Value);
                 }
                 sb.Append("; ");
             }

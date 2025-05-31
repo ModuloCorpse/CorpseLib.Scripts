@@ -1,12 +1,14 @@
-﻿namespace CorpseLib.Scripts
+﻿namespace CorpseLib.Scripts.Context
 {
-    public class Frame
+    public class VariableScope
     {
-        private readonly Frame? m_Parent = null;
+        private readonly VariableScope? m_Parent = null;
         private readonly Dictionary<int, Variable> m_Variables = [];
 
-        public Frame() { }
-        public Frame(Frame parent) => m_Parent = parent;
+        internal VariableScope? Parent => m_Parent;
+
+        public VariableScope() { }
+        public VariableScope(VariableScope parent) => m_Parent = parent;
 
         public void AddVariable(int id, Variable value) => m_Variables[id] = value;
 

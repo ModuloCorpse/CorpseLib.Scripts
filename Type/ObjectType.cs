@@ -75,50 +75,33 @@ namespace CorpseLib.Scripts.Type
             return [.. ret];
         }
 
-        public override object[]? Parse(string str)
+        private bool CheckObject(object[] value)
         {
-            if (str == "null")
+            foreach (object obj in value)
+            {
+                if (obj is not object[])
+                    return false;
+            }
+            return true;
+        }
+
+        public override object[]? Convert(object[] str)
+        {
+            if (str.Length == 0)
                 return [];
-            string[] split = SplitObject(str);
+            if (!CheckObject(str))
+                return null;
             int i = 0;
             List<Variable> variables = [];
             foreach (Parameter attribute in m_Attributes)
             {
-                if (i < split.Length)
-                    variables.Add(m_Attributes[i].Instantiate(split[i]) ?? throw new ArgumentException("Invalid object"));
+                if (i < str.Length)
+                    variables.Add(m_Attributes[i].Convert((object[])str[i]) ?? throw new ArgumentException("Invalid object"));
                 else
                     variables.Add(m_Attributes[i].Instantiate() ?? throw new ArgumentException("Invalid object"));
                 ++i;
             }
             return [..variables];
-        }
-
-        public override string ToString(object[]? value)
-        {
-            if (value == null)
-                throw new ArgumentException("Object has no value");
-            if (value.Length == 0)
-                return "null";
-            StringBuilder builder = new("{");
-            for (int i = 0; i != value.Length; ++i)
-            {
-                if (value[i] is Variable var)
-                {
-                    if (!var.IsDefault())
-                    {
-                        if (i != 0)
-                            builder.Append(',');
-                        builder.Append(' ');
-                        builder.Append(var.Type.ToString(var.Values));
-                    }
-                }
-                else
-                    throw new ArgumentException("Object is not valid");
-            }
-            if (value.Length != 0)
-                builder.Append(' ');
-            builder.Append('}');
-            return builder.ToString();
         }
 
         public override bool IsOfType(object[]? value)

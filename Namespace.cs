@@ -1,6 +1,6 @@
 ﻿namespace CorpseLib.Scripts
 {
-    public class Namespace(int id) : Environment
+    public class Namespace(int id) : OldEnvironment
     {
         private readonly Namespace? m_Parent = null;
         private readonly int m_ID = id;

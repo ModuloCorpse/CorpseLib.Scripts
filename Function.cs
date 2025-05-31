@@ -1,4 +1,5 @@
 ﻿using CorpseLib.Scripts.Instruction;
+using Environment = CorpseLib.Scripts.Context.Environment;
 
 namespace CorpseLib.Scripts
 {
@@ -8,21 +9,28 @@ namespace CorpseLib.Scripts
 
         public AInstruction[] Instructions => [..m_Instructions];
 
-        internal override object? InternalExecute(Frame frame)
+        internal override object? InternalExecute(Environment env)
         {
             FunctionStack stack = new();
-            Frame functionFrame = new(frame);
+            env.OpenScope();
             foreach (AInstruction instruction in m_Instructions)
             {
                 if (instruction is Break || instruction is Continue)
+                {
+                    env.CloseScope();
                     return new();
+                }
                 else
                 {
-                    instruction.ExecuteInstruction(functionFrame, stack);
+                    instruction.ExecuteInstruction(env, stack);
                     if (stack.HasReturn)
+                    {
+                        env.CloseScope();
                         return new();
+                    }
                 }
             }
+            env.CloseScope();
             return stack.ReturnValue;
         }
 

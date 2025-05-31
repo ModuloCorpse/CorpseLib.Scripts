@@ -4,10 +4,8 @@
     {
         public VoidType() : base() { }
 
-        public override bool IsOfType(object[]? value) => false;
+        public override bool IsOfType(object[]? _) => false;
 
-        public override object[]? Parse(string str) => null;
-
-        public override string ToString(object[]? value) => string.Empty;
+        public override object[]? Convert(object[] _) => null;
     }
 }

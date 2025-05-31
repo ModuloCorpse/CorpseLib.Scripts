@@ -1,6 +1,8 @@
-﻿namespace CorpseLib.Scripts.Instruction
-{
-    public class Break : AInstruction { protected override void Execute(Frame frame, FunctionStack instructionStack) { } }
+﻿using Environment = CorpseLib.Scripts.Context.Environment;
 
-    public class Continue : AInstruction { protected override void Execute(Frame frame, FunctionStack instructionStack) { } }
+namespace CorpseLib.Scripts.Instruction
+{
+    public class Break : AInstruction { protected override void Execute(Environment env, FunctionStack instructionStack) { } }
+
+    public class Continue : AInstruction { protected override void Execute(Environment env, FunctionStack instructionStack) { } }
 }

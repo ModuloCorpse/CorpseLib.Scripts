@@ -1,4 +1,6 @@
-﻿namespace CorpseLib.Scripts
+﻿using Environment = CorpseLib.Scripts.Context.Environment;
+
+namespace CorpseLib.Scripts
 {
     public abstract class AFunction
     {
@@ -10,7 +12,7 @@
 
         internal object? Call(object?[] parameters)
         {
-            Frame frame = new();
+            Environment env = new();
             int i = 0;
             while (i != m_Signature.Parameters.Length)
             {
@@ -21,17 +23,17 @@
                     argument = param.Instantiate();
                 else if (param.Type.IsOfType([paramValue]))
                     argument = param.Instantiate([paramValue]);
-                frame.AddVariable(param.ID, argument!);
-                //Fill frame with parameters
+                env.AddVariable(param.ID, argument!);
+                //Fill env with parameters
                 ++i;
             }
             if (i > parameters.Length)
             {
                 return null;
             }
-            return InternalExecute(frame);
+            return InternalExecute(env);
         }
 
-        internal abstract object? InternalExecute(Frame frame);
+        internal abstract object? InternalExecute(Environment env);
     }
 }

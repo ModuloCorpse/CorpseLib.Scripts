@@ -1,6 +1,7 @@
 ﻿using CorpseLib.Scripts.Type.Primitive;
 using CorpseLib.Scripts.Type;
 using System.Text;
+using CorpseLib.Scripts.Context;
 using CorpseLib.Scripts.Instruction;
 
 namespace CorpseLib.Scripts
@@ -27,6 +28,52 @@ namespace CorpseLib.Scripts
         {
             m_Error = string.Format("ERROR : {0} : {1}", error, description);
             m_HasErrors = true;
+        }
+
+        private class CommentAndTags(int[] commentIDs, string[] tags)
+        {
+            public int[] CommentIDs = commentIDs;
+            public string[] Tags = tags;
+        }
+
+        private void LoadCommentAndTags(ref string str, List<int> commentIDs, List<string> tags)
+        {
+            if (str.StartsWith("/*"))
+            {
+                while (str.StartsWith("/*"))
+                {
+                    int endIndex = str.IndexOf("*/");
+                    string comment = str[2..endIndex].Trim();
+                    commentIDs.Add(int.Parse(comment));
+                    str = str[(endIndex + 2)..].Trim();
+                }
+                LoadCommentAndTags(ref str, commentIDs, tags);
+            }
+            else if (str.StartsWith('['))
+            {
+                Tuple<string, string, string> tagsTuple = IsolateScope(str, '[', ']', out bool tagFound);
+                if (tagFound)
+                {
+                    tags.AddRange(SplitTags(tagsTuple.Item2));
+                    str = tagsTuple.Item3;
+                }
+                else
+                {
+                    RegisterError("Invalid script", "Invalid tags");
+                    return;
+                }
+                LoadCommentAndTags(ref str, commentIDs, tags);
+            }
+        }
+
+        private CommentAndTags? LoadCommentAndTags(ref string str)
+        {
+            List<int> commentIDs = [];
+            List<string> tags = [];
+            LoadCommentAndTags(ref str, commentIDs, tags);
+            if (m_HasErrors)
+                return null;
+            return new CommentAndTags([.. commentIDs], [.. tags]);
         }
 
         private static string RemoveFirst(string str, string toRemove)
@@ -307,7 +354,7 @@ namespace CorpseLib.Scripts
             return new(new(conversionTable.PushName(template), []));
         }
 
-        private Parameter? ParseParameter(string parameter, Environment env, ConversionTable conversionTable)
+        private Parameter? ParseParameter(string parameter, OldEnvironment env, ConversionTable conversionTable)
         {
             if (string.IsNullOrEmpty(parameter))
             {
@@ -329,8 +376,11 @@ namespace CorpseLib.Scripts
                 RegisterError("Invalid script", "Parameter type cannot be void");
                 return null;
             }
+            object[]? value = null;
             if (parameterParts.Length == 3)
-                return new Parameter(parameterType, isConst, conversionTable.PushName(parameterParts[1]), parameterType.InternalParse(parameterParts[2]));
+                value = ParseValue(parameterParts[2]);
+            if (value != null)
+                return new Parameter(parameterType, isConst, conversionTable.PushName(parameterParts[1]), parameterType.InternalConvert(value));
             else
                 return new Parameter(parameterType, isConst, conversionTable.PushName(parameterParts[1]));
         }
@@ -442,7 +492,7 @@ namespace CorpseLib.Scripts
             return [.. result];
         }
 
-        private FunctionSignature? ParseFunctionSignature(string parametersStr, string signatureStr, Environment env, ConversionTable conversionTable, out string functionName)
+        private FunctionSignature? ParseFunctionSignature(string parametersStr, string signatureStr, OldEnvironment env, ConversionTable conversionTable, out string functionName)
         {
             string[] signatureParts = signatureStr.Split(' ');
             string returnTypeStr;
@@ -602,6 +652,10 @@ namespace CorpseLib.Scripts
             List<AInstruction> instructions = [];
             while (!string.IsNullOrEmpty(body))
             {
+                CommentAndTags? commentAndTags = LoadCommentAndTags(ref body);
+                //TODO : Handle comments and tags
+                if (m_HasErrors)
+                    return [];
                 if (body.StartsWith("else"))
                 {
                     RegisterError(string.Format("Invalid function {0}", functionName), "else outside of if");
@@ -630,6 +684,10 @@ namespace CorpseLib.Scripts
                     if (m_HasErrors)
                         return [];
                     List<AInstruction> doBody = FunctionLoadBody(functionName, keyWordParams.Item2);
+                    if (m_HasErrors)
+                        return [];
+                    CommentAndTags? doWhileCommentAndTags = LoadCommentAndTags(ref body);
+                    //TODO : Handle comments and tags
                     if (m_HasErrors)
                         return [];
                     if (body.StartsWith("while"))
@@ -682,7 +740,167 @@ namespace CorpseLib.Scripts
             return instructions;
         }
 
-        private void LoadStructure(string objectTypeName, string structContent, Environment env, ConversionTable conversionTable)
+        private static Tuple<string, string> IsolateFirstElem(string str)
+        {
+            for (int i = 0; i < str.Length; ++i)
+            {
+                if (str[i] == ',')
+                {
+                    string elem = str[..i];
+                    string ret = str[(i + 1)..];
+                    if (ret.Length > 0 && ret[0] == ' ')
+                        ret = ret[1..];
+                    return new(elem, ret);
+                }
+            }
+            return new(str, string.Empty);
+        }
+
+        private object[] ParseValue(string str)
+        {
+            if (str == "null")
+                return [];
+            if (str.Length > 2 && str[0] == '{' && str[^1] == '}')
+            {
+                str = str[1..^1];
+                if (str.Length > 0 && str[^1] == ' ')
+                    str = str[..^1];
+                if (str.Length > 0 && str[0] == ' ')
+                    str = str[1..];
+                List<object[]> variables = [];
+                while (!string.IsNullOrEmpty(str))
+                {
+                    if (str[0] == '[')
+                    {
+                        Tuple<string, string> split = NextElement(str, '[', ']');
+                        variables.Add(ParseValue(split.Item1));
+                        str = split.Item2;
+                    }
+                    else if (str[0] == '{')
+                    {
+                        Tuple<string, string> split = NextElement(str, '{', '}');
+                        variables.Add(ParseValue(split.Item1));
+                        str = split.Item2;
+                    }
+                    else if (str[0] == '"')
+                    {
+                        Tuple<string, string> split = NextString(str);
+                        variables.Add(ParseValue(split.Item1));
+                        str = split.Item2;
+                    }
+                    else
+                    {
+                        Tuple<string, string> split = IsolateFirstElem(str);
+                        variables.Add(ParseValue(split.Item1));
+                        str = split.Item2;
+                    }
+                }
+                return [.. variables];
+            }
+            else if (str.Length > 2 && str[0] == '[' && str[^1] == ']')
+            {
+                str = str[1..^1];
+                if (str.Length > 0 && str[^1] == ' ')
+                    str = str[..^1];
+                if (str.Length > 0 && str[0] == ' ')
+                    str = str[1..];
+                if (str[0] == '[')
+                {
+                    List<object[]> variables = [];
+                    while (!string.IsNullOrEmpty(str))
+                    {
+                        Tuple<string, string> split = NextElement(str, '[', ']');
+                        variables.Add(ParseValue(split.Item1));
+                        str = split.Item2;
+                    }
+                    return [variables];
+                }
+                else if (str[0] == '{')
+                {
+                    List<object[]> variables = [];
+                    while (!string.IsNullOrEmpty(str))
+                    {
+                        Tuple<string, string> split = NextElement(str, '{', '}');
+                        variables.Add(ParseValue(split.Item1));
+                        str = split.Item2;
+                    }
+                    return [variables];
+                }
+                else
+                {
+                    List<object[]> variables = [];
+                    string[] elements = Shell.Helper.Split(str, ',');
+                    foreach (string element in elements)
+                        variables.Add(ParseValue(element));
+                    return [variables];
+                }
+            }
+            else if (str.Length > 2 && str[0] == '"' && str[^1] == '"')
+                return [str[1..^1]];
+            else if (str.Length > 2 && str[0] == '\'' && str[^1] == '\'')
+            {
+                if (str.Length == 3)
+                    return [str[1]];
+                else
+                {
+                    RegisterError("Invalid script", string.Format("Invalid char : {0}", str));
+                    return [];
+                }
+            }
+            else
+            {
+                if (str == "true")
+                    return [true];
+                else if (str == "false")
+                    return [false];
+                else if (str.Contains('.'))
+                {
+                    if (double.TryParse(str, out double value))
+                    {
+                        if (value >= float.MinValue && value <= float.MaxValue)
+                            return [(float)value];
+                        else
+                            return [value];
+                    }
+                    RegisterError("Invalid script", string.Format("Cannot parse float value : {0}", str));
+                    return [];
+                }
+                else
+                {
+                    if (str[0] == '-')
+                    {
+                        if (long.TryParse(str, out long value))
+                        {
+                            if (value >= sbyte.MinValue && value <= sbyte.MaxValue)
+                                return [(sbyte)value];
+                            else if (value >= short.MinValue && value <= short.MaxValue)
+                                return [(short)value];
+                            else if (value >= int.MinValue && value <= int.MaxValue)
+                                return [(int)value];
+                            else
+                                return [value];
+                        }
+                    }
+                    else
+                    {
+                        if (ulong.TryParse(str, out ulong value))
+                        {
+                            if (value >= byte.MinValue && value <= byte.MaxValue)
+                                return [(byte)value];
+                            else if (value >= ushort.MinValue && value <= ushort.MaxValue)
+                                return [(ushort)value];
+                            else if (value >= uint.MinValue && value <= uint.MaxValue)
+                                return [(uint)value];
+                            else
+                                return [value];
+                        }
+                    }
+                }
+            }
+            return [str]; //We consider it a string not delimited as some split can remove " from strings
+        }
+
+        private void LoadStructure(string objectTypeName, string structContent, OldEnvironment env, ConversionTable conversionTable)
         {
             if (!string.IsNullOrEmpty(objectTypeName))
             {
@@ -701,7 +919,7 @@ namespace CorpseLib.Scripts
                         RegisterError("Invalid template", "No template given");
                         return;
                     }
-                    TemplateDefinition templateDefinition = new(templateName, templateTypes);
+                    TypeDefinition templateDefinition = new(templateName, templateTypes);
                     env.AddTemplateDefinition(templateDefinition);
                     while (!string.IsNullOrEmpty(structContent))
                     {
@@ -711,10 +929,28 @@ namespace CorpseLib.Scripts
                             RegisterError("Invalid script", string.Format("Bad structure definition for {0}", templateName));
                             return;
                         }
-                        string[] parameterParts = SplitParameter(structAttribute.Item1, out bool isConst);
+                        string attribute = structAttribute.Item1;
+                        CommentAndTags? commentAndTags = LoadCommentAndTags(ref attribute);
                         if (m_HasErrors)
                             return;
-                        ATypeInstance? parameterType = env.Instantiate(parameterParts[0], conversionTable);
+                        //TODO : Handle comments and tags
+                        string[] parameterParts = SplitParameter(attribute, out bool _);
+                        if (m_HasErrors)
+                            return;
+                        if (parameterParts.Length != 2 && parameterParts.Length != 3)
+                        {
+                            RegisterError("Invalid script", string.Format("Bad structure definition for {0}", templateName));
+                            return;
+                        }
+                        OperationResult<TypeInfo> attributeTypeInfo = TypeInfo.ParseStr(parameterParts[0], conversionTable);
+                        if (!attributeTypeInfo)
+                        {
+                            RegisterError(attributeTypeInfo.Error, attributeTypeInfo.Description);
+                            return;
+                        }
+                        int nameID = conversionTable.PushName(parameterParts[1]);
+                        object[]? value = (parameterParts.Length == 3) ? ParseValue(parameterParts[2]) : null;
+                        ATypeInstance? parameterType = env.Instantiate(attributeTypeInfo.Result!);
                         if (parameterType != null)
                         {
                             if (parameterType is VoidType)
@@ -722,31 +958,10 @@ namespace CorpseLib.Scripts
                                 RegisterError("Invalid script", "Parameter type cannot be void");
                                 return;
                             }
-                            if (parameterParts.Length == 3)
-                                templateDefinition.AddAttributeDefinition(new Parameter(parameterType, isConst, conversionTable.PushName(parameterParts[1]), parameterType.InternalParse(parameterParts[2])));
-                            else
-                                templateDefinition.AddAttributeDefinition(new Parameter(parameterType, isConst, conversionTable.PushName(parameterParts[1])));
+                            templateDefinition.AddAttribute(attributeTypeInfo.Result!, nameID, value);
                         }
                         else
-                        {
-                            if (parameterParts.Length == 2 || parameterParts.Length == 3)
-                            {
-                                OperationResult<TypeInfo> attributeTypeInfo = TypeInfo.ParseStr(parameterParts[0], conversionTable);
-                                if (!attributeTypeInfo)
-                                {
-                                    RegisterError(attributeTypeInfo.Error, attributeTypeInfo.Description);
-                                    return;
-                                }
-                                int nameID = conversionTable.PushName(parameterParts[1]);
-                                string? value = (parameterParts.Length == 3) ? parameterParts[2] : null;
-                                templateDefinition.AddAttributeDefinition(attributeTypeInfo.Result!, nameID, value);
-                            }
-                            else
-                            {
-                                RegisterError("Invalid script", string.Format("Bad structure definition for {0}", templateName));
-                                return;
-                            }
-                        }
+                            templateDefinition.AddTemplateAttribute(attributeTypeInfo.Result!, nameID, value);
                         structContent = structAttribute.Item2;
                     }
                 }
@@ -771,7 +986,12 @@ namespace CorpseLib.Scripts
                             RegisterError("Invalid script", string.Format("Bad structure definition for {0}", objectTypeName));
                             return;
                         }
-                        Parameter? result = ParseParameter(structAttribute.Item1, env, conversionTable);
+                        string attribute = structAttribute.Item1;
+                        CommentAndTags? commentAndTags = LoadCommentAndTags(ref attribute);
+                        //TODO : Handle comments and tags
+                        if (m_HasErrors)
+                            return;
+                        Parameter? result = ParseParameter(attribute, env, conversionTable);
                         if (m_HasErrors)
                             return;
                         structDefinition.AddAttribute(result!);
@@ -876,25 +1096,14 @@ namespace CorpseLib.Scripts
             return [.. result];
         }
 
-        private void LoadNamespaceContent(Environment @namespace, string str, ConversionTable conversionTable)
+        private void LoadNamespaceContent(OldEnvironment @namespace, string str, ConversionTable conversionTable)
         {
             while (!string.IsNullOrEmpty(str))
             {
-                if (str.StartsWith('['))
-                {
-                    Tuple<string, string, string> tagsTuple = IsolateScope(str, '[', ']', out bool tagFound);
-                    if (tagFound)
-                    {
-                        string[] tags = SplitTags(tagsTuple.Item2);
-                        //TODO Load tag
-                        str = tagsTuple.Item3;
-                    }
-                    else
-                    {
-                        RegisterError("Invalid script", "Invalid tags");
-                        return;
-                    }
-                }
+                CommentAndTags? commentAndTags = LoadCommentAndTags(ref str);
+                //TODO : Handle comments and tags
+                if (m_HasErrors)
+                    return;
 
                 if (!string.IsNullOrEmpty(str))
                 {
@@ -984,7 +1193,7 @@ namespace CorpseLib.Scripts
             }
         }
 
-        private void LoadNamespace(string namespaceName, string namespaceContent, Environment env, ConversionTable conversionTable)
+        private void LoadNamespace(string namespaceName, string namespaceContent, OldEnvironment env, ConversionTable conversionTable)
         {
             Namespace? parent = (env is Namespace namespc) ? namespc : null;
             Namespace @namespace = new(conversionTable.PushName(namespaceName), parent);
@@ -1001,14 +1210,14 @@ namespace CorpseLib.Scripts
             return;
         }
 
-        private List<string> TrimComments(ref string str)
+        private List<AComment> TrimComments(ref string str)
         {
             bool inString = false;
             bool inMultiLineComment = false;
             bool inSingleLineComment = false;
             StringBuilder sb = new();
             StringBuilder commentBuilder = new();
-            List<string> comments = [];
+            List<AComment> comments = [];
             for (int i = 0; i < str.Length; ++i)
             {
                 char c = str[i];
@@ -1018,7 +1227,10 @@ namespace CorpseLib.Scripts
                     {
                         ++i;
                         inMultiLineComment = false;
-                        comments.Add(commentBuilder.ToString().Trim());
+                        string comment = commentBuilder.ToString().Trim();
+                        int commentID = comments.Count;
+                        comments.Add(new MultiLineComment(comment.Split('\n')));
+                        sb.Append($"/*{commentID}*/");
                         commentBuilder.Clear();
                     }
                     else
@@ -1030,7 +1242,10 @@ namespace CorpseLib.Scripts
                     {
                         commentBuilder.Append(c);
                         inSingleLineComment = false;
-                        comments.Add(commentBuilder.ToString().Trim());
+                        string comment = commentBuilder.ToString().Trim();
+                        int commentID = comments.Count;
+                        comments.Add(new SingleLineComment(comment));
+                        sb.Append($"/*{commentID}*/");
                         commentBuilder.Clear();
                     }
                     else
@@ -1086,19 +1301,19 @@ namespace CorpseLib.Scripts
 
         public Script? ParseScript(string str)
         {
-            List<string> comments = TrimComments(ref str);
+            List<AComment> comments = TrimComments(ref str);
             if (m_HasErrors)
                 return null;
             int i = 0;
-            foreach (string comment in comments)
-            {
-                Console.WriteLine("===== Comment {0} =====", i++);
-                Console.WriteLine(comment);
-            }
             Shell.Helper.TrimCommand(ref str);
             Script script = new();
             //TODO Parse imports/include
             LoadNamespaceContent(script, str, script.ConversionTable);
+            foreach (AComment comment in comments)
+            {
+                Console.WriteLine("===== Comment {0} =====", i++);
+                Console.WriteLine(comment);
+            }
             if (m_HasErrors)
                 return null;
             return script;

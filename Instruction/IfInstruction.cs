@@ -1,4 +1,6 @@
-﻿namespace CorpseLib.Scripts.Instruction
+﻿using Environment = CorpseLib.Scripts.Context.Environment;
+
+namespace CorpseLib.Scripts.Instruction
 {
     public class IfInstruction(Condition condition, List<AInstruction> body) : AConditionalInstruction(condition, body)
     {
@@ -10,13 +12,13 @@
         internal void AddElif(Condition condition, List<AInstruction> body) => m_Elifs.Add(new(condition, body));
         internal void SetElseBody(List<AInstruction> body) => m_ElseBody.AddInstructions(body);
 
-        private ScopedInstructions GetInstructions(Frame frame, FunctionStack functionStack)
+        private ScopedInstructions GetInstructions(Environment env, FunctionStack functionStack)
         {
-            if (EvaluateCondition(frame, functionStack))
+            if (EvaluateCondition(env, functionStack))
                 return Body;
             foreach (var elif in m_Elifs)
             {
-                if (elif.EvaluateCondition(frame, functionStack))
+                if (elif.EvaluateCondition(env, functionStack))
                     return elif.Body;
             }
             if (!m_ElseBody.IsEmpty)
@@ -24,7 +26,7 @@
             return new();
         }
 
-        protected override void Execute(Frame env, FunctionStack functionStack)
+        protected override void Execute(Environment env, FunctionStack functionStack)
         {
             ScopedInstructions instructions = GetInstructions(env, functionStack);
             if (instructions.IsEmpty)

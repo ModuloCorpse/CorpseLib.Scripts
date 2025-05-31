@@ -1,10 +1,11 @@
 ﻿using CorpseLib.Scripts.Type.Primitive;
 using CorpseLib.Scripts.Type;
 using System.Diagnostics.CodeAnalysis;
+using CorpseLib.Scripts.Context;
 
 namespace CorpseLib.Scripts
 {
-    public class Environment
+    public class OldEnvironment
     {
         private class TemplateInstanceHolder
         {
@@ -114,15 +115,15 @@ namespace CorpseLib.Scripts
         {
             private class TemplateDefinitionHolderTreeNode
             {
-                private readonly Dictionary<int, TemplateDefinition> m_TemplateDefinitions = [];
+                private readonly Dictionary<int, TypeDefinition> m_TemplateDefinitions = [];
 
-                public bool TryGetValue(TypeInfo typeInfo, [MaybeNullWhen(false)] out TemplateDefinition value) => m_TemplateDefinitions.TryGetValue(typeInfo.TemplateTypes.Length, out value);
-                public void Add(TemplateDefinition type) => m_TemplateDefinitions[type.Templates.Length] = type;
-                public TemplateDefinition[] Values => [.. m_TemplateDefinitions.Values];
+                public bool TryGetValue(TypeInfo typeInfo, [MaybeNullWhen(false)] out TypeDefinition value) => m_TemplateDefinitions.TryGetValue(typeInfo.TemplateTypes.Length, out value);
+                public void Add(TypeDefinition type) => m_TemplateDefinitions[type.Templates.Length] = type;
+                public TypeDefinition[] Values => [.. m_TemplateDefinitions.Values];
             }
 
             private readonly Dictionary<int, TemplateDefinitionHolderTreeNode> m_TemplateDefinitions = [];
-            public bool TryGetValue(TypeInfo typeInfo, [MaybeNullWhen(false)] out TemplateDefinition value)
+            public bool TryGetValue(TypeInfo typeInfo, [MaybeNullWhen(false)] out TypeDefinition value)
             {
                 if (m_TemplateDefinitions.TryGetValue(typeInfo.ID, out TemplateDefinitionHolderTreeNode? node))
                     return node.TryGetValue(typeInfo, out value);
@@ -130,7 +131,7 @@ namespace CorpseLib.Scripts
                 return false;
             }
 
-            public void Add(TemplateDefinition type)
+            public void Add(TypeDefinition type)
             {
                 if (m_TemplateDefinitions.TryGetValue(type.ID, out TemplateDefinitionHolderTreeNode? node))
                     node.Add(type);
@@ -142,11 +143,11 @@ namespace CorpseLib.Scripts
                 }
             }
 
-            public TemplateDefinition[] Values
+            public TypeDefinition[] Values
             {
                 get
                 {
-                    List<TemplateDefinition> ret = [];
+                    List<TypeDefinition> ret = [];
                     foreach (TemplateDefinitionHolderTreeNode node in m_TemplateDefinitions.Values)
                         ret.AddRange(node.Values);
                     return [.. ret];
@@ -161,14 +162,14 @@ namespace CorpseLib.Scripts
         private readonly Dictionary<int, Parameter> m_Globals = [];
         private readonly Dictionary<int, Namespace> m_Namespaces = [];
 
-        public TemplateDefinition[] Definitions => [.. m_TemplateDefinitions.Values];
+        public TypeDefinition[] Definitions => [.. m_TemplateDefinitions.Values];
         public ATypeInstance[] TemplateTypeInstances => m_TemplateTypeInstances.Values;
         public ATypeInstance[] Instances => [.. m_TypeInstances.Values];
         public AFunction[] Functions => [.. m_Functions.Values];
         public Parameter[] Globals => [.. m_Globals.Values];
         public Namespace[] Namespaces => [.. m_Namespaces.Values];
 
-        public void AddTemplateDefinition(TemplateDefinition type) => m_TemplateDefinitions.Add(type);
+        public void AddTemplateDefinition(TypeDefinition type) => m_TemplateDefinitions.Add(type);
 
         public void AddType(ATypeInstance type) => m_TypeInstances[type.TypeInfo.ID] = type;
 
@@ -225,7 +226,7 @@ namespace CorpseLib.Scripts
             {
                 if (m_TemplateTypeInstances.TryGetValue(typeInfo, out ATypeInstance? templateObjectInstance))
                     return templateObjectInstance;
-                else if (m_TemplateDefinitions.TryGetValue(typeInfo, out TemplateDefinition? ret))
+                else if (m_TemplateDefinitions.TryGetValue(typeInfo, out TypeDefinition? ret))
                     return ret.Instantiate(typeInfo, this);
                 return null;
             }

@@ -32,7 +32,7 @@ namespace CorpseLib.Scripts
             return Instantiate();
         }
 
-        public Variable? Instantiate(string value) => new(m_Type, m_Type.InternalParse(value), false);
+        public Variable? Convert(object[] value) => new(m_Type, m_Type.InternalConvert(value), false);
 
         public override bool Equals(object? obj) => obj is Parameter parameter && m_Type == parameter.m_Type && m_ID == parameter.m_ID && m_DefaultValue == parameter.m_DefaultValue;
         public override int GetHashCode() => HashCode.Combine(m_Type, m_ID, m_DefaultValue);

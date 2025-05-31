@@ -34,51 +34,18 @@ namespace CorpseLib.Scripts.Type.Primitive
             return [.. ret];
         }
 
-        public override object[]? Parse(string str)
+        public override object[]? Convert(object[] value)
         {
-            if (str == "null")
-                return [];
-            if (str.Length <= 2 || str[0] != '[' || str[^1] != ']')
-                throw new ArgumentException(string.Format("Invalid array string : \"{0}\"", str));
-            str = str[1..^1];
-            if (str.Length > 0 && str[^1] == ' ')
-                str = str[..^1];
-            if (str.Length > 0 && str[0] == ' ')
-                str = str[1..];
-            string[] elements;
-            if (m_ElementType is ArrayType)
-                elements = SplitArray(str);
-            else if (m_ElementType is ARawPrimitive)
-                elements = Shell.Helper.Split(str, ',');
-            else
-                elements = SplitObjects(str);
-            List<Variable> variables = [];
-            foreach (string element in elements)
-                variables.Add(new(m_ElementType, m_ElementType.InternalParse(element), false));
-            return variables.ToArray();
-        }
-
-        public override string ToString(object[]? value)
-        {
-            if (value == null)
-                throw new ArgumentException("Array has no value");
             if (value.Length == 0)
-                return "null";
-            StringBuilder builder = new("[");
-            for (int i = 0; i != value.Length; ++i)
-            {
-                if (i != 0)
-                    builder.Append(',');
-                builder.Append(' ');
-                if (value[i] is Variable var)
-                    builder.Append(m_ElementType.ToString(var.Values));
-                else
-                    throw new ArgumentException("Array is not valid");
-            }
-            if (value.Length != 0)
-                builder.Append(' ');
-            builder.Append(']');
-            return builder.ToString();
+                return [];
+            if (value.Length != 1)
+                return null;
+            if (value[0] is not List<object[]> elements)
+                return null;
+            List<Variable> variables = [];
+            foreach (object[] element in elements)
+                variables.Add(new(m_ElementType, m_ElementType.InternalConvert(element), false));
+            return variables.ToArray();
         }
 
         public override bool IsOfType(object[]? value)

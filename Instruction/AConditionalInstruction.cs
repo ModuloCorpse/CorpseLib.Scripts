@@ -1,4 +1,6 @@
-﻿namespace CorpseLib.Scripts.Instruction
+﻿using Environment = CorpseLib.Scripts.Context.Environment;
+
+namespace CorpseLib.Scripts.Instruction
 {
     public abstract class AConditionalInstruction(Condition condition, List<AInstruction> body) : AInstruction
     {
@@ -8,7 +10,7 @@
         public ScopedInstructions Body => m_Body;
         public Condition Condition => m_Condition;
 
-        protected bool EvaluateCondition(Frame frame, FunctionStack functionStack)
+        protected bool EvaluateCondition(Environment env, FunctionStack functionStack)
         {
             return false;
         }

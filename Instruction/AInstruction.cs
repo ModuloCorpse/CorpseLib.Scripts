@@ -1,13 +1,16 @@
-﻿namespace CorpseLib.Scripts.Instruction
+﻿using Environment = CorpseLib.Scripts.Context.Environment;
+
+namespace CorpseLib.Scripts.Instruction
 {
     public abstract class AInstruction
     {
-        internal void ExecuteInstruction(Frame frame, FunctionStack instructionStack)
+        internal void ExecuteInstruction(Environment env, FunctionStack instructionStack)
         {
-            Frame executionFrame = new(frame);
-            Execute(executionFrame, instructionStack);
+            env.OpenScope();
+            Execute(env, instructionStack);
+            env.CloseScope();
         }
 
-        protected abstract void Execute(Frame frame, FunctionStack instructionStack);
+        protected abstract void Execute(Environment env, FunctionStack instructionStack);
     }
 }

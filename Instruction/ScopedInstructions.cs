@@ -1,4 +1,6 @@
-﻿namespace CorpseLib.Scripts.Instruction
+﻿using Environment = CorpseLib.Scripts.Context.Environment;
+
+namespace CorpseLib.Scripts.Instruction
 {
     public class ScopedInstructions
     {
@@ -22,22 +24,32 @@
         public void AddInstruction(AInstruction instruction) => m_Instructions.Add(instruction);
         public void AddInstructions(IEnumerable<AInstruction> instructions) => m_Instructions.AddRange(instructions);
 
-        public EExecutionResult Execute(Frame frame, FunctionStack functionStack)
+        public EExecutionResult Execute(Environment env, FunctionStack functionStack)
         {
-            Frame subFrame = new(frame);
+            env.OpenScope();
             foreach (AInstruction instruction in m_Instructions)
             {
                 if (instruction is Break)
+                {
+                    env.CloseScope();
                     return EExecutionResult.Breaked;
+                }
                 else if (instruction is Continue)
+                {
+                    env.CloseScope();
                     return EExecutionResult.Continued;
+                }
                 else
                 {
-                    instruction.ExecuteInstruction(subFrame, functionStack);
+                    instruction.ExecuteInstruction(env, functionStack);
                     if (functionStack.HasReturn)
+                    {
+                        env.CloseScope();
                         return EExecutionResult.Returned;
+                    }
                 }
             }
+            env.CloseScope();
             return EExecutionResult.None;
         }
     }

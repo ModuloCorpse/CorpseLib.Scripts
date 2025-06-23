@@ -3,6 +3,8 @@ using CorpseLib.Scripts.Type;
 using System.Text;
 using CorpseLib.Scripts.Context;
 using CorpseLib.Scripts.Instruction;
+using CorpseLib.Scripts.Parser;
+using Environment = CorpseLib.Scripts.Context.Environment;
 
 namespace CorpseLib.Scripts
 {
@@ -14,29 +16,104 @@ namespace CorpseLib.Scripts
     // - functions
     public class ScriptParser
     {
-        private readonly List<string> m_Warnings = [];
-        private string m_Error = string.Empty;
-        private bool m_HasErrors = false;
-
-        public List<string> Warnings => m_Warnings;
-        public string Error => m_Error;
-        public bool HasErrors => m_HasErrors;
-
-        private void RegisterWarning(string warning, string description) => m_Warnings.Add(string.Format("WARNING : {0} : {1}", warning, description));
-
-        private void RegisterError(string error, string description)
-        {
-            m_Error = string.Format("ERROR : {0} : {1}", error, description);
-            m_HasErrors = true;
-        }
-
-        private class CommentAndTags(int[] commentIDs, string[] tags)
+        private class CommentAndTags(int[] commentIDs, int[] tags)
         {
             public int[] CommentIDs = commentIDs;
-            public string[] Tags = tags;
+            public int[] Tags = tags;
         }
 
-        private void LoadCommentAndTags(ref string str, List<int> commentIDs, List<string> tags)
+        //TODO improve tags indexing and parsing
+        private static int[] SplitTags(string tags, ParsingContext parsingContext)
+        {
+            List<int> result = [];
+            bool inString = false;
+            int inParameters = 0;
+            StringBuilder builder = new();
+            int i = 0;
+            char stringChar = '\0';
+            while (i < tags.Length)
+            {
+                char c = tags[i];
+                if (inString || inParameters != 0)
+                {
+                    if (c == stringChar)
+                        inString = false;
+                    else if (c == '"' || c == '\'')
+                    {
+                        inString = true;
+                        stringChar = c;
+                    }
+                    else if (!inString)
+                    {
+                        if (c == '(')
+                            ++inParameters;
+                        else if (c == ')')
+                            --inParameters;
+                    }
+                    if (!inString && inParameters == 0)
+                    {
+                        while ((i + 1) < tags.Length && tags[i + 1] != ',')
+                        {
+                            ++i;
+                            if (!char.IsWhiteSpace(tags[i]))
+                                return [];
+                        }
+                    }
+                    builder.Append(c);
+                }
+                else if (c == ',')
+                {
+                    if (builder.Length > 0)
+                    {
+                        result.Add(parsingContext.PushName(builder.ToString()));
+                        builder.Clear();
+                    }
+                }
+                else if (c == '"' || c == '\'')
+                {
+                    inString = true;
+                    stringChar = c;
+                    if (builder.Length > 0)
+                    {
+                        foreach (char builderChar in builder.ToString())
+                        {
+                            if (!char.IsWhiteSpace(tags[i]))
+                                return [];
+                        }
+                        builder.Clear();
+                    }
+                }
+                else if (c == '(')
+                {
+                    ++inParameters;
+                    builder.Append(c);
+                    if ((i + 1) < tags.Length && tags[i + 1] == ')')
+                    {
+                        --inParameters;
+                        ++i;
+                        c = tags[i];
+                        builder.Append(c);
+                    }
+                }
+                else if (c == '\\')
+                {
+                    ++i;
+                    c = tags[i];
+                    builder.Append(c);
+                }
+                else
+                    builder.Append(c);
+                ++i;
+            }
+            if (builder.Length > 0)
+            {
+                result.Add(parsingContext.PushName(builder.ToString()));
+                builder.Clear();
+            }
+            return [.. result];
+        }
+
+        private void LoadCommentAndTags(ref string str, List<int> commentIDs, List<int> tags, ParsingContext parsingContext)
         {
             if (str.StartsWith("/*"))
             {
@@ -47,31 +124,31 @@ namespace CorpseLib.Scripts
                     commentIDs.Add(int.Parse(comment));
                     str = str[(endIndex + 2)..].Trim();
                 }
-                LoadCommentAndTags(ref str, commentIDs, tags);
+                LoadCommentAndTags(ref str, commentIDs, tags, parsingContext);
             }
             else if (str.StartsWith('['))
             {
                 Tuple<string, string, string> tagsTuple = IsolateScope(str, '[', ']', out bool tagFound);
                 if (tagFound)
                 {
-                    tags.AddRange(SplitTags(tagsTuple.Item2));
+                    tags.AddRange(SplitTags(tagsTuple.Item2, parsingContext));
                     str = tagsTuple.Item3;
                 }
                 else
                 {
-                    RegisterError("Invalid script", "Invalid tags");
+                    parsingContext.RegisterError("Invalid script", "Invalid tags");
                     return;
                 }
-                LoadCommentAndTags(ref str, commentIDs, tags);
+                LoadCommentAndTags(ref str, commentIDs, tags, parsingContext);
             }
         }
 
-        private CommentAndTags? LoadCommentAndTags(ref string str)
+        private CommentAndTags? LoadCommentAndTags(ref string str, ParsingContext parsingContext)
         {
             List<int> commentIDs = [];
-            List<string> tags = [];
-            LoadCommentAndTags(ref str, commentIDs, tags);
-            if (m_HasErrors)
+            List<int> tags = [];
+            LoadCommentAndTags(ref str, commentIDs, tags, parsingContext);
+            if (parsingContext.HasErrors)
                 return null;
             return new CommentAndTags([.. commentIDs], [.. tags]);
         }
@@ -242,12 +319,12 @@ namespace CorpseLib.Scripts
             return new(str, string.Empty);
         }
 
-        private string[] SplitParameter(string parameter, out bool isConst)
+        private string[] SplitParameter(string parameter, out bool isConst, ParsingContext parsingContext)
         {
             isConst = false;
             if (string.IsNullOrEmpty(parameter))
             {
-                RegisterError("Misformated parameter string", "Empty parameter");
+                parsingContext.RegisterError("Misformated parameter string", "Empty parameter");
                 return [];
             }
             if (parameter.StartsWith("const "))
@@ -264,7 +341,7 @@ namespace CorpseLib.Scripts
                     value = value[1..];
                 if (string.IsNullOrEmpty(value))
                 {
-                    RegisterError("Misformated parameter string", "Empty value");
+                    parsingContext.RegisterError("Misformated parameter string", "Empty value");
                     return [];
                 }
                 string toSplit = parameter[..assignationIndex];
@@ -273,7 +350,7 @@ namespace CorpseLib.Scripts
                 string[] parameterParts = Shell.Helper.Split(toSplit, ' ');
                 if (parameterParts.Length != 2)
                 {
-                    RegisterError("Misformated parameter string", "Parameter should be [type] [name] = [value]");
+                    parsingContext.RegisterError("Misformated parameter string", "Parameter should be [type] [name] = [value]");
                     return [];
                 }
                 ret.AddRange(parameterParts);
@@ -284,7 +361,7 @@ namespace CorpseLib.Scripts
                 string[] parameterParts = Shell.Helper.Split(parameter, ' ');
                 if (parameterParts.Length != 2)
                 {
-                    RegisterError("Misformated parameter string", "Parameter should be [type] [name]");
+                    parsingContext.RegisterError("Misformated parameter string", "Parameter should be [type] [name]");
                     return [];
                 }
                 ret.AddRange(parameterParts);
@@ -292,7 +369,7 @@ namespace CorpseLib.Scripts
             return [.. ret];
         }
 
-        private static OperationResult<int[]> SplitTemplate(string template, ConversionTable conversionTable)
+        private static OperationResult<int[]> SplitTemplate(string template, ParsingContext parsingContext)
         {
             List<int> result = [];
             StringBuilder builder = new();
@@ -316,7 +393,7 @@ namespace CorpseLib.Scripts
                 {
                     if (builder.Length > 0)
                     {
-                        result.Add(conversionTable.PushName(builder.ToString()));
+                        result.Add(parsingContext.PushName(builder.ToString()));
                         builder.Clear();
                     }
                     else
@@ -333,56 +410,62 @@ namespace CorpseLib.Scripts
                     builder.Append(c);
             }
             if (builder.Length > 0)
-                result.Add(conversionTable.PushName(builder.ToString()));
+                result.Add(parsingContext.PushName(builder.ToString()));
             return new([.. result]);
         }
 
-        private static OperationResult<Tuple<int, int[]>> ExtractTypeName(string template, ConversionTable conversionTable)
+        private static OperationResult<Tuple<string, int[]>> ExtractTypeName(string template, ParsingContext parsingContext)
         {
             int templateIdx = template.IndexOf('<');
             if (templateIdx >= 0)
             {
-                OperationResult<int[]> templatesResult = SplitTemplate(template[(templateIdx + 1)..^1], conversionTable);
+                OperationResult<int[]> templatesResult = SplitTemplate(template[(templateIdx + 1)..^1], parsingContext);
                 if (templatesResult && templatesResult.Result != null)
                 {
                     int[] templateTypesIDs = templatesResult.Result;
                     string templateName = template[..templateIdx];
-                    return new(new(conversionTable.PushName(templateName), templateTypesIDs));
+                    return new(new(templateName, templateTypesIDs));
                 }
                 return new(templatesResult.Error, templatesResult.Description);
             }
-            return new(new(conversionTable.PushName(template), []));
+            return new(new(template, []));
         }
 
-        private Parameter? ParseParameter(string parameter, OldEnvironment env, ConversionTable conversionTable)
+        private Parameter? ParseParameter(string parameter, OldEnvironment env, ParsingContext parsingContext)
         {
             if (string.IsNullOrEmpty(parameter))
             {
-                RegisterError("Misformated parameter string", "Empty parameter");
+                parsingContext.RegisterError("Misformated parameter string", "Empty parameter");
                 return null;
             }
             //TODO : Do not loose constness (Maybe use a TypeInfo)
-            string[] parameterParts = SplitParameter(parameter, out bool isConst);
-            if (m_HasErrors)
+            string[] parameterParts = SplitParameter(parameter, out bool isConst, parsingContext);
+            if (parsingContext.HasErrors)
                 return null;
-            ATypeInstance? parameterType = env.Instantiate(parameterParts[0], conversionTable);
+            OperationResult<TypeInfo> typeInfo = TypeInfo.ParseStr(parameterParts[0], parsingContext.ConversionTable);
+            if (!typeInfo)
+            {
+                parsingContext.RegisterError(typeInfo.Error, typeInfo.Description);
+                return null;
+            }
+            ATypeInstance? parameterType = env.Instantiate(typeInfo.Result!);
             if (parameterType == null)
             {
-                RegisterError("Unknown parameter type", parameterParts[0]);
+                parsingContext.RegisterError("Unknown parameter type", parameterParts[0]);
                 return null;
             }
             if (parameterType is VoidType)
             {
-                RegisterError("Invalid script", "Parameter type cannot be void");
+                parsingContext.RegisterError("Invalid script", "Parameter type cannot be void");
                 return null;
             }
             object[]? value = null;
             if (parameterParts.Length == 3)
-                value = ParseValue(parameterParts[2]);
+                value = ParseValue(parameterParts[2], parsingContext);
             if (value != null)
-                return new Parameter(parameterType, isConst, conversionTable.PushName(parameterParts[1]), parameterType.InternalConvert(value));
+                return new Parameter(parameterType, isConst, parsingContext.PushName(parameterParts[1]), parameterType.InternalConvert(value));
             else
-                return new Parameter(parameterType, isConst, conversionTable.PushName(parameterParts[1]));
+                return new Parameter(parameterType, isConst, parsingContext.PushName(parameterParts[1]));
         }
 
         private static string[] FunctionSignatureParameterSplit(string content)
@@ -492,7 +575,7 @@ namespace CorpseLib.Scripts
             return [.. result];
         }
 
-        private FunctionSignature? ParseFunctionSignature(string parametersStr, string signatureStr, OldEnvironment env, ConversionTable conversionTable, out string functionName)
+        private FunctionSignature? ParseFunctionSignature(string parametersStr, string signatureStr, OldEnvironment env, ParsingContext parsingContext, out string functionName)
         {
             string[] signatureParts = signatureStr.Split(' ');
             string returnTypeStr;
@@ -512,7 +595,7 @@ namespace CorpseLib.Scripts
                 }
                 default:
                 {
-                    RegisterError("Misformated function signature string", string.Format("Bad signature : {0}", parametersStr));
+                    parsingContext.RegisterError("Misformated function signature string", string.Format("Bad signature : {0}", parametersStr));
                     functionName = string.Empty;
                     return null;
                 }
@@ -523,19 +606,26 @@ namespace CorpseLib.Scripts
                 string[] parametersStrArr = FunctionSignatureParameterSplit(parametersStr);
                 for (int i = 0; i != parametersStrArr.Length; ++i)
                 {
-                    Parameter? result = ParseParameter(parametersStrArr[i], env, conversionTable);
-                    if (m_HasErrors)
+                    Parameter? result = ParseParameter(parametersStrArr[i], env, parsingContext);
+                    if (parsingContext.HasErrors)
                         return null;
                     parameters.Add(result!);
                 }
             }
-            ATypeInstance? returnType = env.Instantiate(returnTypeStr, conversionTable);
-            if (returnType == null)
+
+            OperationResult<TypeInfo> returnTypeInfo = TypeInfo.ParseStr(returnTypeStr, parsingContext.ConversionTable);
+            if (!returnTypeInfo)
             {
-                RegisterError("Misformated function signature string", string.Format("Unknown return type : {0}", returnTypeStr));
+                parsingContext.RegisterError(returnTypeInfo.Error, returnTypeInfo.Description);
                 return null;
             }
-            return new(returnType, conversionTable.PushName(functionName), [.. parameters]);
+            ATypeInstance? returnType = env.Instantiate(returnTypeInfo.Result!);
+            if (returnType == null)
+            {
+                parsingContext.RegisterError("Misformated function signature string", string.Format("Unknown return type : {0}", returnTypeStr));
+                return null;
+            }
+            return new(returnType, parsingContext.PushName(functionName), [.. parameters]);
         }
 
         private AInstruction? ParseInstruction(string instruction)
@@ -548,7 +638,7 @@ namespace CorpseLib.Scripts
             return new DebugInstruction(instruction);
         }
 
-        private Tuple<string, string> ParseKeyword(string functionName, string keyword, ref string str, bool shouldHaveCondition)
+        private Tuple<string, string> ParseKeyword(string errorMessage, string keyword, ref string str, bool shouldHaveCondition, ParsingContext parsingContext)
         {
             str = RemoveFirst(str, keyword);
             string condition = string.Empty;
@@ -564,13 +654,13 @@ namespace CorpseLib.Scripts
                 }
                 else
                 {
-                    RegisterError(string.Format("Invalid function {0}", functionName), string.Format("Bad condition in {0}", keyword));
+                    parsingContext.RegisterError(errorMessage, string.Format("Bad condition in {0}", keyword));
                     return new(string.Empty, string.Empty);
                 }
             }
             if (str.Length == 0)
             {
-                RegisterError(string.Format("Invalid function {0}", functionName), string.Format("Empty body in {0}", keyword));
+                parsingContext.RegisterError(errorMessage, string.Format("Empty body in {0}", keyword));
                 return new(string.Empty, string.Empty);
             }
             if (str[0] == '{')
@@ -578,13 +668,13 @@ namespace CorpseLib.Scripts
                 tuple = IsolateScope(str, '{', '}', out found);
                 if (!found)
                 {
-                    RegisterError(string.Format("Invalid function {0}", functionName), string.Format("Bad body in {0}", keyword));
+                    parsingContext.RegisterError(errorMessage, string.Format("Bad body in {0}", keyword));
                     return new(string.Empty, string.Empty);
                 }
                 string body = tuple.Item2;
                 if (string.IsNullOrWhiteSpace(body))
                 {
-                    RegisterError(string.Format("Invalid function {0}", functionName), string.Format("Empty body in {0}", keyword));
+                    parsingContext.RegisterError(errorMessage, string.Format("Empty body in {0}", keyword));
                     return new(string.Empty, string.Empty);
                 }
                 str = tuple.Item3;
@@ -595,13 +685,13 @@ namespace CorpseLib.Scripts
                 Tuple<string, string> instruction = NextInstruction(str, out found);
                 if (!found)
                 {
-                    RegisterError(string.Format("Invalid function {0}", functionName), string.Format("Bad body in {0}", keyword));
+                    parsingContext.RegisterError(errorMessage, string.Format("Bad body in {0}", keyword));
                     return new(string.Empty, string.Empty);
                 }
                 string body = instruction.Item1 + ';';
                 if (string.IsNullOrWhiteSpace(body))
                 {
-                    RegisterError(string.Format("Invalid function {0}", functionName), string.Format("Empty body in {0}", keyword));
+                    parsingContext.RegisterError(errorMessage, string.Format("Empty body in {0}", keyword));
                     return new(string.Empty, string.Empty);
                 }
                 str = instruction.Item2;
@@ -615,127 +705,135 @@ namespace CorpseLib.Scripts
             return new Condition(condition);
         }
 
-        private IfInstruction? LoadIf(string functionName, ref string str)
+        private IfInstruction? LoadIf(string errorMessage, ref string str, ParsingContext parsingContext)
         {
-            Tuple<string, string> keyWordParams = ParseKeyword(functionName, "if", ref str, true);
-            if (m_HasErrors)
+            Tuple<string, string> keyWordParams = ParseKeyword(errorMessage, "if", ref str, true, parsingContext);
+            if (parsingContext.HasErrors)
                 return null;
-            List<AInstruction> ifResult = FunctionLoadBody(functionName, keyWordParams.Item2);
-            if (m_HasErrors)
+            List<AInstruction> ifResult = FunctionLoadBody(errorMessage, keyWordParams.Item2, parsingContext);
+            if (parsingContext.HasErrors)
                 return null;
             IfInstruction ifInstruction = new(ParseCondition(keyWordParams.Item1), ifResult);
             while (str.StartsWith("elif"))
             {
-                keyWordParams = ParseKeyword(functionName, "elif", ref str, true);
-                if (m_HasErrors)
+                keyWordParams = ParseKeyword(errorMessage, "elif", ref str, true, parsingContext);
+                if (parsingContext.HasErrors)
                     return null;
-                List<AInstruction> elseIfResult = FunctionLoadBody(functionName, keyWordParams.Item2);
-                if (m_HasErrors)
+                List<AInstruction> elseIfResult = FunctionLoadBody(errorMessage, keyWordParams.Item2, parsingContext);
+                if (parsingContext.HasErrors)
                     return null;
                 ifInstruction.AddElif(ParseCondition(keyWordParams.Item1), elseIfResult);
             }
             if (str.StartsWith("else"))
             {
-                keyWordParams = ParseKeyword(functionName, "else", ref str, false);
-                if (m_HasErrors)
+                keyWordParams = ParseKeyword(errorMessage, "else", ref str, false, parsingContext);
+                if (parsingContext.HasErrors)
                     return null;
-                List<AInstruction> elseResult = FunctionLoadBody(functionName, keyWordParams.Item2);
-                if (m_HasErrors)
+                List<AInstruction> elseResult = FunctionLoadBody(errorMessage, keyWordParams.Item2, parsingContext);
+                if (parsingContext.HasErrors)
                     return null;
                 ifInstruction.SetElseBody(elseResult);
             }
             return ifInstruction;
         }
 
-        private List<AInstruction> FunctionLoadBody(string functionName, string body)
+        private AInstruction? LoadInstruction(string errorMessage, ref string body, ParsingContext parsingContext)
+        {
+            CommentAndTags? commentAndTags = LoadCommentAndTags(ref body, parsingContext);
+            //TODO : Handle comments and tags
+            if (parsingContext.HasErrors)
+                return null;
+            if (body.StartsWith("else"))
+            {
+                parsingContext.RegisterError(errorMessage, "else outside of if");
+                return null;
+            }
+            else if (body.StartsWith("if"))
+            {
+                AInstruction? ifInstruction = LoadIf(errorMessage, ref body, parsingContext);
+                if (parsingContext.HasErrors)
+                    return null;
+                return ifInstruction!;
+            }
+            else if (body.StartsWith("while"))
+            {
+                Tuple<string, string> keyWordParams = ParseKeyword(errorMessage, "while", ref body, true, parsingContext);
+                if (parsingContext.HasErrors)
+                    return null;
+                List<AInstruction> whileBody = FunctionLoadBody(errorMessage, keyWordParams.Item2, parsingContext);
+                if (parsingContext.HasErrors)
+                    return null;
+                return new WhileInstruction(ParseCondition(keyWordParams.Item1), whileBody);
+            }
+            else if (body.StartsWith("do"))
+            {
+                Tuple<string, string> keyWordParams = ParseKeyword(errorMessage, "do", ref body, false, parsingContext);
+                if (parsingContext.HasErrors)
+                    return null;
+                List<AInstruction> doBody = FunctionLoadBody(errorMessage, keyWordParams.Item2, parsingContext);
+                if (parsingContext.HasErrors)
+                    return null;
+                CommentAndTags? doWhileCommentAndTags = LoadCommentAndTags(ref body, parsingContext);
+                //TODO : Handle comments and tags
+                if (parsingContext.HasErrors)
+                    return null;
+                if (body.StartsWith("while"))
+                {
+                    Tuple<string, string, string> tuple = IsolateScope(body, '(', ')', out bool found);
+                    if (found)
+                    {
+                        body = tuple.Item3;
+                        return new DoWhileInstruction(ParseCondition(tuple.Item2), doBody);
+                    }
+                    else
+                    {
+                        parsingContext.RegisterError(errorMessage, "Bad condition in do");
+                        return null;
+                    }
+                }
+                else
+                {
+                    parsingContext.RegisterError(errorMessage, "do without while");
+                    return null;
+                }
+            }
+            else if (body.StartsWith("for"))
+            {
+                Tuple<string, string> keyWordParams = ParseKeyword(errorMessage, "for", ref body, true, parsingContext);
+                if (parsingContext.HasErrors)
+                    return null;
+                List<AInstruction> forBody = FunctionLoadBody(errorMessage, keyWordParams.Item2, parsingContext);
+                if (parsingContext.HasErrors)
+                    return null;
+                //TODO
+                parsingContext.RegisterError("Not Supported Yet", "For not supported yet, please use while for now");
+                return null;
+            }
+            else
+            {
+                Tuple<string, string> instructionParams = NextInstruction(body, out bool found);
+                if (!found)
+                {
+                    parsingContext.RegisterError(errorMessage, "Bad instruction");
+                    return null;
+                }
+                body = instructionParams.Item2;
+                AInstruction? instruction = ParseInstruction(instructionParams.Item1);
+                if (parsingContext.HasErrors)
+                    return null;
+                return instruction!;
+            }
+        }
+
+        private List<AInstruction> FunctionLoadBody(string errorMessage, string body, ParsingContext parsingContext)
         {
             List<AInstruction> instructions = [];
             while (!string.IsNullOrEmpty(body))
             {
-                CommentAndTags? commentAndTags = LoadCommentAndTags(ref body);
-                //TODO : Handle comments and tags
-                if (m_HasErrors)
+                AInstruction? instruction = LoadInstruction(errorMessage, ref body, parsingContext);
+                if (parsingContext.HasErrors)
                     return [];
-                if (body.StartsWith("else"))
-                {
-                    RegisterError(string.Format("Invalid function {0}", functionName), "else outside of if");
-                    return [];
-                }
-                else if (body.StartsWith("if"))
-                {
-                    AInstruction? ifInstruction = LoadIf(functionName, ref body);
-                    if (m_HasErrors)
-                        return [];
-                    instructions.Add(ifInstruction!);
-                }
-                else if (body.StartsWith("while"))
-                {
-                    Tuple<string, string> keyWordParams = ParseKeyword(functionName, "while", ref body, true);
-                    if (m_HasErrors)
-                        return [];
-                    List<AInstruction> whileBody = FunctionLoadBody(functionName, keyWordParams.Item2);
-                    if (m_HasErrors)
-                        return [];
-                    instructions.Add(new WhileInstruction(ParseCondition(keyWordParams.Item1), whileBody));
-                }
-                else if (body.StartsWith("do"))
-                {
-                    Tuple<string, string> keyWordParams = ParseKeyword(functionName, "do", ref body, false);
-                    if (m_HasErrors)
-                        return [];
-                    List<AInstruction> doBody = FunctionLoadBody(functionName, keyWordParams.Item2);
-                    if (m_HasErrors)
-                        return [];
-                    CommentAndTags? doWhileCommentAndTags = LoadCommentAndTags(ref body);
-                    //TODO : Handle comments and tags
-                    if (m_HasErrors)
-                        return [];
-                    if (body.StartsWith("while"))
-                    {
-                        Tuple<string, string, string> tuple = IsolateScope(body, '(', ')', out bool found);
-                        if (found)
-                        {
-                            body = tuple.Item3;
-                            instructions.Add(new DoWhileInstruction(ParseCondition(tuple.Item2), doBody));
-                        }
-                        else
-                        {
-                            RegisterError(string.Format("Invalid function {0}", functionName), "Bad condition in do");
-                            return [];
-                        }
-                    }
-                    else
-                    {
-                        RegisterError(string.Format("Invalid function {0}", functionName), "do without while");
-                        return [];
-                    }
-                }
-                else if (body.StartsWith("for"))
-                {
-                    Tuple<string, string> keyWordParams = ParseKeyword(functionName, "for", ref body, true);
-                    if (m_HasErrors)
-                        return [];
-                    List<AInstruction> forBody = FunctionLoadBody(functionName, keyWordParams.Item2);
-                    if (m_HasErrors)
-                        return [];
-                    //TODO
-                    RegisterError("Not Supported Yet", "For not supported yet, please use while for now");
-                    return [];
-                }
-                else
-                {
-                    Tuple<string, string> instructionParams = NextInstruction(body, out bool found);
-                    if (!found)
-                    {
-                        RegisterError(string.Format("Invalid function {0}", functionName), "Bad instruction");
-                        return [];
-                    }
-                    body = instructionParams.Item2;
-                    AInstruction? instruction = ParseInstruction(instructionParams.Item1);
-                    if (m_HasErrors)
-                        return [];
-                    instructions.Add(instruction!);
-                }
+                instructions.Add(instruction!);
             }
             return instructions;
         }
@@ -756,7 +854,7 @@ namespace CorpseLib.Scripts
             return new(str, string.Empty);
         }
 
-        private object[] ParseValue(string str)
+        private object[] ParseValue(string str, ParsingContext parsingContext)
         {
             if (str == "null")
                 return [];
@@ -773,25 +871,25 @@ namespace CorpseLib.Scripts
                     if (str[0] == '[')
                     {
                         Tuple<string, string> split = NextElement(str, '[', ']');
-                        variables.Add(ParseValue(split.Item1));
+                        variables.Add(ParseValue(split.Item1, parsingContext));
                         str = split.Item2;
                     }
                     else if (str[0] == '{')
                     {
                         Tuple<string, string> split = NextElement(str, '{', '}');
-                        variables.Add(ParseValue(split.Item1));
+                        variables.Add(ParseValue(split.Item1, parsingContext));
                         str = split.Item2;
                     }
                     else if (str[0] == '"')
                     {
                         Tuple<string, string> split = NextString(str);
-                        variables.Add(ParseValue(split.Item1));
+                        variables.Add(ParseValue(split.Item1, parsingContext));
                         str = split.Item2;
                     }
                     else
                     {
                         Tuple<string, string> split = IsolateFirstElem(str);
-                        variables.Add(ParseValue(split.Item1));
+                        variables.Add(ParseValue(split.Item1, parsingContext));
                         str = split.Item2;
                     }
                 }
@@ -810,7 +908,7 @@ namespace CorpseLib.Scripts
                     while (!string.IsNullOrEmpty(str))
                     {
                         Tuple<string, string> split = NextElement(str, '[', ']');
-                        variables.Add(ParseValue(split.Item1));
+                        variables.Add(ParseValue(split.Item1, parsingContext));
                         str = split.Item2;
                     }
                     return [variables];
@@ -821,7 +919,7 @@ namespace CorpseLib.Scripts
                     while (!string.IsNullOrEmpty(str))
                     {
                         Tuple<string, string> split = NextElement(str, '{', '}');
-                        variables.Add(ParseValue(split.Item1));
+                        variables.Add(ParseValue(split.Item1, parsingContext));
                         str = split.Item2;
                     }
                     return [variables];
@@ -831,7 +929,7 @@ namespace CorpseLib.Scripts
                     List<object[]> variables = [];
                     string[] elements = Shell.Helper.Split(str, ',');
                     foreach (string element in elements)
-                        variables.Add(ParseValue(element));
+                        variables.Add(ParseValue(element, parsingContext));
                     return [variables];
                 }
             }
@@ -843,7 +941,7 @@ namespace CorpseLib.Scripts
                     return [str[1]];
                 else
                 {
-                    RegisterError("Invalid script", string.Format("Invalid char : {0}", str));
+                    parsingContext.RegisterError("Invalid script", string.Format("Invalid char : {0}", str));
                     return [];
                 }
             }
@@ -862,7 +960,7 @@ namespace CorpseLib.Scripts
                         else
                             return [value];
                     }
-                    RegisterError("Invalid script", string.Format("Cannot parse float value : {0}", str));
+                    parsingContext.RegisterError("Invalid script", string.Format("Cannot parse float value : {0}", str));
                     return [];
                 }
                 else
@@ -900,243 +998,131 @@ namespace CorpseLib.Scripts
             return [str]; //We consider it a string not delimited as some split can remove " from strings
         }
 
-        private void LoadStructure(string objectTypeName, string structContent, OldEnvironment env, ConversionTable conversionTable)
+        private void LoadStructure(string objectTypeName, string structContent, OldEnvironment env, ParsingContext parsingContext, CommentAndTags commentAndTags)
         {
             if (!string.IsNullOrEmpty(objectTypeName))
             {
-                if (objectTypeName.Contains('<'))
+                OperationResult<Tuple<string, int[]>> tupleResult = ExtractTypeName(objectTypeName, parsingContext);
+                if (!tupleResult)
                 {
-                    OperationResult<Tuple<int, int[]>> tupleResult = ExtractTypeName(objectTypeName, conversionTable);
-                    if (!tupleResult)
-                    {
-                        RegisterError(tupleResult.Error, tupleResult.Description);
-                        return;
-                    }
-                    int templateName = tupleResult.Result!.Item1;
-                    int[] templateTypes = tupleResult.Result!.Item2;
-                    if (templateTypes.Length == 0)
-                    {
-                        RegisterError("Invalid template", "No template given");
-                        return;
-                    }
-                    TypeDefinition templateDefinition = new(templateName, templateTypes);
-                    env.AddTemplateDefinition(templateDefinition);
-                    while (!string.IsNullOrEmpty(structContent))
-                    {
-                        Tuple<string, string> structAttribute = NextInstruction(structContent, out bool foundAttribute);
-                        if (!foundAttribute)
-                        {
-                            RegisterError("Invalid script", string.Format("Bad structure definition for {0}", templateName));
-                            return;
-                        }
-                        string attribute = structAttribute.Item1;
-                        CommentAndTags? commentAndTags = LoadCommentAndTags(ref attribute);
-                        if (m_HasErrors)
-                            return;
-                        //TODO : Handle comments and tags
-                        string[] parameterParts = SplitParameter(attribute, out bool _);
-                        if (m_HasErrors)
-                            return;
-                        if (parameterParts.Length != 2 && parameterParts.Length != 3)
-                        {
-                            RegisterError("Invalid script", string.Format("Bad structure definition for {0}", templateName));
-                            return;
-                        }
-                        OperationResult<TypeInfo> attributeTypeInfo = TypeInfo.ParseStr(parameterParts[0], conversionTable);
-                        if (!attributeTypeInfo)
-                        {
-                            RegisterError(attributeTypeInfo.Error, attributeTypeInfo.Description);
-                            return;
-                        }
-                        int nameID = conversionTable.PushName(parameterParts[1]);
-                        object[]? value = (parameterParts.Length == 3) ? ParseValue(parameterParts[2]) : null;
-                        ATypeInstance? parameterType = env.Instantiate(attributeTypeInfo.Result!);
-                        if (parameterType != null)
-                        {
-                            if (parameterType is VoidType)
-                            {
-                                RegisterError("Invalid script", "Parameter type cannot be void");
-                                return;
-                            }
-                            templateDefinition.AddAttribute(attributeTypeInfo.Result!, nameID, value);
-                        }
-                        else
-                            templateDefinition.AddTemplateAttribute(attributeTypeInfo.Result!, nameID, value);
-                        structContent = structAttribute.Item2;
-                    }
+                    parsingContext.RegisterError(tupleResult.Error, tupleResult.Description);
+                    return;
                 }
-                else
+                string templateName = tupleResult.Result!.Item1;
+                OperationResult<TypeInfo> objectTypeTypeInfo = TypeInfo.ParseStr(templateName, parsingContext.ConversionTable);
+                if (!objectTypeTypeInfo)
                 {
-                    OperationResult<TypeInfo> objectTypeTypeInfo = TypeInfo.ParseStr(objectTypeName, conversionTable);
-                    if (!objectTypeTypeInfo)
+                    parsingContext.RegisterError(objectTypeTypeInfo.Error, objectTypeTypeInfo.Description);
+                    return;
+                }
+                TypeInfo typeInfo = objectTypeTypeInfo.Result!;
+                TypeInfo realTypeInfo = new(typeInfo.IsConst, parsingContext.Namespaces, typeInfo.ID, typeInfo.TemplateTypes, typeInfo.IsArray);
+                ObjectType structDefinition = new(realTypeInfo);
+                TypeDefinition typeDefinition = new(new Signature(parsingContext.Namespaces, realTypeInfo.ID), tupleResult.Result!.Item2);
+                parsingContext.PushTypeDefinition(typeDefinition, commentAndTags.Tags, commentAndTags.CommentIDs);
+                env.AddTypeDefinition(typeDefinition);
+                while (!string.IsNullOrEmpty(structContent))
+                {
+                    Tuple<string, string> structAttribute = NextInstruction(structContent, out bool foundAttribute);
+                    if (!foundAttribute)
                     {
-                        RegisterError(objectTypeTypeInfo.Error, objectTypeTypeInfo.Description);
+                        parsingContext.RegisterError("Invalid script", string.Format("Bad structure definition for {0}", templateName));
                         return;
                     }
-                    TypeInfo typeInfo = objectTypeTypeInfo.Result!;
-                    int[] namespaceIDs = (env is Namespace @namespace) ? @namespace.IDS : [];
-                    TypeInfo realTypeInfo = new(typeInfo.IsConst, namespaceIDs, typeInfo.ID, typeInfo.TemplateTypes, typeInfo.IsArray);
-                    ObjectType structDefinition = new(realTypeInfo);
-                    env.AddType(structDefinition);
-                    while (!string.IsNullOrEmpty(structContent))
+                    string attribute = structAttribute.Item1;
+                    CommentAndTags? attributeCommentAndTags = LoadCommentAndTags(ref attribute, parsingContext);
+                    if (parsingContext.HasErrors)
+                        return;
+                    string[] parameterParts = SplitParameter(attribute, out bool _, parsingContext);
+                    if (parsingContext.HasErrors)
+                        return;
+                    if (parameterParts.Length != 2 && parameterParts.Length != 3)
                     {
-                        Tuple<string, string> structAttribute = NextInstruction(structContent, out bool foundAttribute);
-                        if (!foundAttribute)
+                        parsingContext.RegisterError("Invalid script", string.Format("Bad structure definition for {0}", templateName));
+                        return;
+                    }
+                    OperationResult<TypeInfo> attributeTypeInfoResult = TypeInfo.ParseStr(parameterParts[0], parsingContext.ConversionTable);
+                    if (!attributeTypeInfoResult)
+                    {
+                        parsingContext.RegisterError(attributeTypeInfoResult.Error, attributeTypeInfoResult.Description);
+                        return;
+                    }
+                    TypeInfo attributeTypeInfo = attributeTypeInfoResult.Result!;
+                    int nameID = parsingContext.PushName(parameterParts[1]);
+                    object[]? value = (parameterParts.Length == 3) ? ParseValue(parameterParts[2], parsingContext) : null;
+                    ATypeInstance? parameterType = env.Instantiate(attributeTypeInfo);
+                    if (parameterType != null)
+                    {
+                        if (parameterType is VoidType)
                         {
-                            RegisterError("Invalid script", string.Format("Bad structure definition for {0}", objectTypeName));
+                            parsingContext.RegisterError("Invalid script", "Parameter type cannot be void");
                             return;
                         }
-                        string attribute = structAttribute.Item1;
-                        CommentAndTags? commentAndTags = LoadCommentAndTags(ref attribute);
-                        //TODO : Handle comments and tags
-                        if (m_HasErrors)
-                            return;
-                        Parameter? result = ParseParameter(attribute, env, conversionTable);
-                        if (m_HasErrors)
-                            return;
-                        structDefinition.AddAttribute(result!);
-                        structContent = structAttribute.Item2;
+                        typeDefinition.AddAttribute(attributeTypeInfo, attributeCommentAndTags!.Tags, attributeCommentAndTags!.CommentIDs, nameID, value);
+                        if (value != null)
+                            structDefinition.AddAttribute(new Parameter(parameterType, attributeTypeInfo.IsConst, nameID, parameterType.InternalConvert(value)));
+                        else
+                            structDefinition.AddAttribute(new Parameter(parameterType, attributeTypeInfo.IsConst, nameID, null));
                     }
+                    else
+                        typeDefinition.AddTemplateAttribute(attributeTypeInfo, attributeCommentAndTags!.Tags, attributeCommentAndTags!.CommentIDs, nameID, value);
+                    structContent = structAttribute.Item2;
+                }
+
+                if (typeDefinition.Templates.Length == 0)
+                {
+                    env.AddType(structDefinition);
+                    parsingContext.PushType(structDefinition);
                 }
             }
             else
             {
-                RegisterError("Invalid script", "Structure has no name");
+                parsingContext.RegisterError("Invalid script", "Structure has no name");
                 return;
             }
         }
 
-        private static string[] SplitTags(string tags)
-        {
-            List<string> result = [];
-            bool inString = false;
-            int inParameters = 0;
-            StringBuilder builder = new();
-            int i = 0;
-            char stringChar = '\0';
-            while (i < tags.Length)
-            {
-                char c = tags[i];
-                if (inString || inParameters != 0)
-                {
-                    if (c == stringChar)
-                        inString = false;
-                    else if (c == '"' || c == '\'')
-                    {
-                        inString = true;
-                        stringChar = c;
-                    }
-                    else if (!inString)
-                    {
-                        if (c == '(')
-                            ++inParameters;
-                        else if (c == ')')
-                            --inParameters;
-                    }
-                    if (!inString && inParameters == 0)
-                    {
-                        while ((i + 1) < tags.Length && tags[i + 1] != ',')
-                        {
-                            ++i;
-                            if (!char.IsWhiteSpace(tags[i]))
-                                return [];
-                        }
-                    }
-                    builder.Append(c);
-                }
-                else if (c == ',')
-                {
-                    if (builder.Length > 0)
-                    {
-                        result.Add(builder.ToString());
-                        builder.Clear();
-                    }
-                }
-                else if (c == '"' || c == '\'')
-                {
-                    inString = true;
-                    stringChar = c;
-                    if (builder.Length > 0)
-                    {
-                        foreach (char builderChar in builder.ToString())
-                        {
-                            if (!char.IsWhiteSpace(tags[i]))
-                                return [];
-                        }
-                        builder.Clear();
-                    }
-                }
-                else if (c == '(')
-                {
-                    ++inParameters;
-                    builder.Append(c);
-                    if ((i + 1) < tags.Length && tags[i + 1] == ')')
-                    {
-                        --inParameters;
-                        ++i;
-                        c = tags[i];
-                        builder.Append(c);
-                    }
-                }
-                else if (c == '\\')
-                {
-                    ++i;
-                    c = tags[i];
-                    builder.Append(c);
-                }
-                else
-                    builder.Append(c);
-                ++i;
-            }
-            if (builder.Length > 0)
-            {
-                result.Add(builder.ToString());
-                builder.Clear();
-            }
-            return [.. result];
-        }
-
-        private void LoadNamespaceContent(OldEnvironment @namespace, string str, ConversionTable conversionTable)
+        private void LoadNamespaceContent(OldEnvironment @namespace, string str, ParsingContext parsingContext)
         {
             while (!string.IsNullOrEmpty(str))
             {
-                CommentAndTags? commentAndTags = LoadCommentAndTags(ref str);
-                //TODO : Handle comments and tags
-                if (m_HasErrors)
+                CommentAndTags? commentAndTags = LoadCommentAndTags(ref str, parsingContext);
+                if (parsingContext.HasErrors)
                     return;
 
                 if (!string.IsNullOrEmpty(str))
                 {
                     if (str.StartsWith("fct "))
                     {
+                        //TODO : Handle comments and tags
                         Tuple<string, string, string> signatureSplit = IsolateScope(str, '(', ')', out bool parametersFound);
                         if (!parametersFound)
                         {
-                            RegisterError("Misformated function signature string", "Bad parenthesis");
+                            parsingContext.RegisterError("Misformated function signature string", "Bad parenthesis");
                             return;
                         }
                         str = signatureSplit.Item3;
                         //TODO
-                        FunctionSignature? functionSignatureResult = ParseFunctionSignature(signatureSplit.Item2, signatureSplit.Item1[4..], @namespace, conversionTable, out string functionSignatureName);
-                        if (m_HasErrors)
+                        FunctionSignature? functionSignatureResult = ParseFunctionSignature(signatureSplit.Item2, signatureSplit.Item1[4..], @namespace, parsingContext, out string functionSignatureName);
+                        if (parsingContext.HasErrors)
                             return;
                         FunctionSignature functionSignature = functionSignatureResult!;
                         Tuple<string, string, string> scoped = IsolateScope(str, '{', '}', out bool found);
                         if (!found)
                         {
-                            RegisterError("Invalid script", "Bad function definition");
+                            parsingContext.RegisterError("Invalid script", "Bad function definition");
                             return;
                         }
                         str = scoped.Item3;
                         Function function = new(functionSignature);
                         //TODO
-                        List<AInstruction> functionBody = FunctionLoadBody(functionSignatureName, scoped.Item2);
-                        if (m_HasErrors)
+                        List<AInstruction> functionBody = FunctionLoadBody(string.Format("Invalid function {0}", functionSignatureName), scoped.Item2, parsingContext);
+                        if (parsingContext.HasErrors)
                             return;
                         function.AddInstructions(functionBody);
                         if (!@namespace.AddFunction(function))
                         {
-                            RegisterError("Invalid script", string.Format("Function {0} already exist", functionSignatureName));
+                            parsingContext.RegisterError("Invalid script", string.Format("Function {0} already exist", functionSignatureName));
                             return;
                         }
                     }
@@ -1145,11 +1131,11 @@ namespace CorpseLib.Scripts
                         Tuple<string, string, string> scoped = IsolateScope(str, '{', '}', out bool found);
                         if (!found)
                         {
-                            RegisterError("Invalid script", "Bad structure definition");
+                            parsingContext.RegisterError("Invalid script", "Bad structure definition");
                             return;
                         }
-                        LoadStructure(scoped.Item1[7..], scoped.Item2, @namespace, conversionTable);
-                        if (m_HasErrors)
+                        LoadStructure(scoped.Item1[7..], scoped.Item2, @namespace, parsingContext, commentAndTags!);
+                        if (parsingContext.HasErrors)
                             return;
                         str = scoped.Item3;
                     }
@@ -1158,59 +1144,52 @@ namespace CorpseLib.Scripts
                         Tuple<string, string, string> scoped = IsolateScope(str, '{', '}', out bool found);
                         if (!found)
                         {
-                            RegisterError("Invalid script", "Bad namespace definition");
+                            parsingContext.RegisterError("Invalid script", "Bad namespace definition");
                             return;
                         }
-                        LoadNamespace(scoped.Item1[10..], scoped.Item2, @namespace, conversionTable);
-                        if (m_HasErrors)
+                        string namespaceName = scoped.Item1[10..];
+                        int namespaceID = parsingContext.PushNamespace(namespaceName, commentAndTags!.Tags, commentAndTags!.CommentIDs);
+                        LoadNamespace(namespaceName, scoped.Item2, @namespace, parsingContext);
+                        parsingContext.PopNamespace();
+                        if (parsingContext.HasErrors)
                             return;
                         str = scoped.Item3;
                     }
                     else
                     {
-                        Tuple<string, string> instruction = NextInstruction(str, out bool found);
-                        if (!found)
-                        {
-                            RegisterError("Invalid script", "Bad global definition");
+                        AInstruction? instruction = LoadInstruction("Invalid script instructions", ref str, parsingContext);
+                        if (parsingContext.HasErrors || instruction == null)
                             return;
-                        }
-                        Parameter? global = ParseParameter(instruction.Item1, @namespace, conversionTable);
-                        if (m_HasErrors)
-                            return;
-                        if (!@namespace.AddGlobal(global!))
-                        {
-                            RegisterError("Invalid script", string.Format("Variable {0} already exist", global!.ID));
-                            return;
-                        }
-                        str = instruction.Item2;
+                        //TODO : Handle specifically global variables instructions
+                        //TODO : Handle namespaces
+                        @namespace.AddInstruction(instruction);
+                        parsingContext.PushInstruction(instruction, parsingContext.Namespaces, commentAndTags!.Tags, commentAndTags.CommentIDs);
                     }
                 }
                 else
                 {
-                    RegisterError("Invalid script", "Tags not associated to anything");
+                    parsingContext.RegisterError("Invalid script", "Tags not associated to anything");
                     return;
                 }
             }
         }
 
-        private void LoadNamespace(string namespaceName, string namespaceContent, OldEnvironment env, ConversionTable conversionTable)
+        private void LoadNamespace(string namespaceName, string namespaceContent, OldEnvironment env, ParsingContext parsingContext)
         {
             Namespace? parent = (env is Namespace namespc) ? namespc : null;
-            Namespace @namespace = new(conversionTable.PushName(namespaceName), parent);
-            LoadNamespaceContent(@namespace, namespaceContent, conversionTable);
-            if (m_HasErrors)
+            Namespace @namespace = new(parsingContext.PushName(namespaceName), parent);
+            LoadNamespaceContent(@namespace, namespaceContent, parsingContext);
+            if (parsingContext.HasErrors)
                 return;
             if (!env.AddNamespace(@namespace))
             {
-                StringBuilder sb = new();
-                ScriptWriter.AppendNamespaceName(ref sb, @namespace, conversionTable);
-                RegisterError("Invalid script", string.Format("Namespace {0} already exist", sb.ToString()));
+                parsingContext.RegisterError("Invalid script", string.Format("Namespace {0} already exist", ScriptWriter.GenerateNamespaceName(parsingContext.Namespaces, parsingContext.ConversionTable)));
                 return;
             }
             return;
         }
 
-        private List<AComment> TrimComments(ref string str)
+        private List<AComment> TrimComments(ref string str, ParsingContext parsingContext)
         {
             bool inString = false;
             bool inMultiLineComment = false;
@@ -1287,36 +1266,37 @@ namespace CorpseLib.Scripts
             }
             if (inMultiLineComment)
             {
-                RegisterError("Comments error", "Unclosing comment");
+                parsingContext.RegisterError("Comments error", "Unclosing comment");
                 return [];
             }
             if (inString)
             {
-                RegisterError("Comments error", "Unclosing string");
+                parsingContext.RegisterError("Comments error", "Unclosing string");
                 return [];
             }
             str = sb.ToString();
             return comments;
         }
 
-        public Script? ParseScript(string str)
+        public ParserResult ParseScript(string str, Environment env)
         {
-            List<AComment> comments = TrimComments(ref str);
-            if (m_HasErrors)
-                return null;
+            ParsingContext parsingContext = new();
+            List<AComment> comments = TrimComments(ref str, parsingContext);
+            if (parsingContext.HasErrors)
+                return new(parsingContext.Error);
             int i = 0;
             Shell.Helper.TrimCommand(ref str);
             Script script = new();
             //TODO Parse imports/include
-            LoadNamespaceContent(script, str, script.ConversionTable);
+            LoadNamespaceContent(script, str, parsingContext);
             foreach (AComment comment in comments)
             {
                 Console.WriteLine("===== Comment {0} =====", i++);
                 Console.WriteLine(comment);
             }
-            if (m_HasErrors)
-                return null;
-            return script;
+            return parsingContext.CreateParserResult(script, comments);
         }
+
+        public ParserResult ParseScript(string str) => ParseScript(str, new Environment());
     }
 }

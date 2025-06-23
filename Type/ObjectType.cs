@@ -35,46 +35,6 @@ namespace CorpseLib.Scripts.Type
             return new(str, string.Empty);
         }
 
-        private static string[] SplitObject(string str)
-        {
-            if (str.Length <= 2 || str[0] != '{' || str[^1] != '}')
-                throw new ArgumentException(string.Format("Invalid object string : \"{0}\"", str));
-            str = str[1..^1];
-            if (str.Length > 0 && str[^1] == ' ')
-                str = str[..^1];
-            if (str.Length > 0 && str[0] == ' ')
-                str = str[1..];
-            List<string> ret = [];
-            while (!string.IsNullOrEmpty(str))
-            {
-                if (str[0] == '[')
-                {
-                    Tuple<string, string> split = ScriptParser.NextElement(str, '[', ']');
-                    ret.Add(split.Item1);
-                    str = split.Item2;
-                }
-                else if (str[0] == '{')
-                {
-                    Tuple<string, string> split = ScriptParser.NextElement(str, '{', '}');
-                    ret.Add(split.Item1);
-                    str = split.Item2;
-                }
-                else if (str[0] == '"')
-                {
-                    Tuple<string, string> split = ScriptParser.NextString(str);
-                    ret.Add(split.Item1);
-                    str = split.Item2;
-                }
-                else
-                {
-                    Tuple<string, string> split = IsolateFirstElem(str);
-                    ret.Add(split.Item1);
-                    str = split.Item2;
-                }
-            }
-            return [.. ret];
-        }
-
         private bool CheckObject(object[] value)
         {
             foreach (object obj in value)

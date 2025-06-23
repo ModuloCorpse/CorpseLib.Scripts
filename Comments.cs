@@ -1,14 +1,12 @@
-﻿using System.Text;
-
-namespace CorpseLib.Scripts
+﻿namespace CorpseLib.Scripts
 {
     public abstract class AComment
     {
-        public abstract void Append(StringBuilder sb);
+        public abstract void Append(ScriptBuilder sb);
 
         public override string ToString()
         {
-            StringBuilder sb = new();
+            ScriptBuilder sb = new(new());
             Append(sb);
             return sb.ToString();
         }
@@ -18,14 +16,14 @@ namespace CorpseLib.Scripts
     {
         private readonly string m_Comment = comment;
         public string Comment => m_Comment;
-        public override void Append(StringBuilder sb) => sb.AppendLine($"// {m_Comment}");
+        public override void Append(ScriptBuilder sb) => sb.AppendLine($"// {m_Comment}");
     }
 
     public class MultiLineComment(string[] comments) : AComment
     {
         private readonly string[] m_Comments = comments;
         public string[] Comments => m_Comments;
-        public override void Append(StringBuilder sb)
+        public override void Append(ScriptBuilder sb)
         {
             sb.Append("/*");
             if (m_Comments.Length != 0)

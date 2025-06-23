@@ -1,18 +1,19 @@
-﻿using System.Text;
+﻿using CorpseLib.Scripts.Context;
+using System.Text;
 
 namespace CorpseLib.Scripts
 {
-    public class TypeInfo(bool isConst, int[] namespaces, int id, TypeInfo[] templates, bool isArray)
+    public class TypeInfo(bool isConst, int[] namespaces, int id, TypeInfo[] templates, bool isArray) : IEquatable<TypeInfo?>
     {
         private readonly TypeInfo[] m_TemplateTypes = templates;
-        private readonly int[] m_NamespacesID = namespaces;
-        private readonly int m_ID = id;
+        private readonly Signature m_Signature = new(namespaces, id);
         private readonly bool m_IsArray = isArray;
         private readonly bool m_IsConst = isConst;
 
         public TypeInfo[] TemplateTypes => m_TemplateTypes;
-        public int[] NamespacesID => m_NamespacesID;
-        public int ID => m_ID;
+        public Signature Signature => m_Signature;
+        public int[] NamespacesID => m_Signature.Namespaces;
+        public int ID => m_Signature.ID;
         public bool IsArray => m_IsArray;
         public bool IsConst => m_IsConst;
 
@@ -112,13 +113,14 @@ namespace CorpseLib.Scripts
             return new(new(isConst, [.. namespaceIDs], conversionTable.PushName(str), [.. templateTypes], isArray));
         }
 
-        public override bool Equals(object? obj) => obj is TypeInfo type &&
-            EqualityComparer<TypeInfo[]>.Default.Equals(m_TemplateTypes, type.m_TemplateTypes) &&
-            EqualityComparer<int[]>.Default.Equals(m_NamespacesID, type.m_NamespacesID) &&
-            m_ID == type.m_ID &&
-            m_IsArray == type.m_IsArray &&
-            m_IsConst == type.m_IsConst;
+        public override bool Equals(object? obj) => Equals(obj as TypeInfo);
+        public bool Equals(TypeInfo? other) => other is not null &&
+            EqualityComparer<TypeInfo[]>.Default.Equals(m_TemplateTypes, other.m_TemplateTypes) &&
+            EqualityComparer<Signature>.Default.Equals(m_Signature, other.m_Signature) &&
+            m_IsArray == other.m_IsArray && m_IsConst == other.m_IsConst;
 
-        public override int GetHashCode() => HashCode.Combine(m_TemplateTypes, m_NamespacesID, m_ID, m_IsArray, m_IsConst);
+        public override int GetHashCode() => HashCode.Combine(m_TemplateTypes, m_Signature, m_IsArray, m_IsConst);
+        public static bool operator ==(TypeInfo? left, TypeInfo? right) => EqualityComparer<TypeInfo>.Default.Equals(left, right);
+        public static bool operator !=(TypeInfo? left, TypeInfo? right) => !(left == right);
     }
 }

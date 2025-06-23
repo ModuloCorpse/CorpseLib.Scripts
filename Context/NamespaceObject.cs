@@ -2,26 +2,14 @@
 {
     public class NamespaceObject(int id, int[] tags, int[] comments) : EnvironmentObject(id, tags, comments)
     {
-        private readonly Dictionary<int, EnvironmentObject> m_Objects = [];
+        private readonly EnvironmentObjectDictionary m_Objects = new();
 
-        public override bool IsValid() => m_Objects.Count > 0;
+        internal EnvironmentObjectDictionary Objects => m_Objects;
 
-        public void ClearInvalid()
-        {
-            List<int> invalidKeys = [];
-            foreach (var obj in m_Objects.Values)
-            {
-                if (obj is NamespaceObject childNamespaceObject)
-                {
-                    childNamespaceObject.ClearInvalid();
-                    if (!childNamespaceObject.IsValid())
-                        invalidKeys.Add(childNamespaceObject.ID);
-                }
-                else if (!obj.IsValid())
-                    invalidKeys.Add(obj.ID);
-            }
-            foreach (var key in invalidKeys)
-                m_Objects.Remove(key);
-        }
+        public override bool IsValid() => !m_Objects.IsEmpty;
+        public void ClearInvalid() => m_Objects.ClearInvalid();
+        public bool Add(EnvironmentObject obj, Signature signature, int namespaceIdx) => m_Objects.Add(obj, signature, namespaceIdx);
+        public bool Add(InstructionObject instruction, int[] namespaces, int namespaceIdx) => m_Objects.Add(instruction, namespaces, namespaceIdx);
+        public EnvironmentObject? Get(Signature signature, int namespaceIdx) => m_Objects.Get(signature, namespaceIdx);
     }
 }

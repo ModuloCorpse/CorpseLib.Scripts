@@ -5,11 +5,12 @@ namespace CorpseLib.Scripts.Context
 {
     public class TypeDefinition
     {
-        internal abstract class AAttributeDefinition(TypeInfo typeInfo, int id, object[]? value)
+        internal abstract class AAttributeDefinition(TypeInfo typeInfo, int[] tags, int[] comments, int id, object[]? value)
         {
             private readonly TypeInfo m_TypeInfo = typeInfo;
+            private readonly int[] m_Tags = tags;
+            private readonly int[] m_Comments = comments;
             private readonly int m_ID = id;
-            //TODO Store value as object[]?
             private readonly object[]? m_Value = value;
 
             internal TypeInfo TypeInfo => m_TypeInfo;
@@ -17,9 +18,10 @@ namespace CorpseLib.Scripts.Context
             internal int ID => m_ID;
 
             public abstract Parameter? Instantiate(Dictionary<int, TypeInfo> templateTypeGiven, OldEnvironment env);
+            public abstract Parameter? Instantiate(Dictionary<int, TypeInfo> templateTypeGiven, Environment env);
         }
 
-        internal class AttributeDefinition(TypeInfo typeInfo, int id, object[]? value) : AAttributeDefinition(typeInfo, id, value)
+        internal class AttributeDefinition(TypeInfo typeInfo, int[] tags, int[] comments, int id, object[]? value) : AAttributeDefinition(typeInfo, tags, comments, id, value)
         {
             public override Parameter? Instantiate(Dictionary<int, TypeInfo> templateTypeGiven, OldEnvironment env)
             {
@@ -33,9 +35,22 @@ namespace CorpseLib.Scripts.Context
                 else
                     return new(parameterType, TypeInfo.IsConst, ID);
             }
+
+            public override Parameter? Instantiate(Dictionary<int, TypeInfo> templateTypeGiven, Environment env)
+            {
+                ATypeInstance? parameterType = env.Instantiate(TypeInfo);
+                if (parameterType == null)
+                    return null;
+                if (parameterType is VoidType)
+                    throw new ArgumentException("Parameter type cannot be void");
+                if (Value != null)
+                    return new(parameterType, TypeInfo.IsConst, ID, parameterType.InternalConvert(Value));
+                else
+                    return new(parameterType, TypeInfo.IsConst, ID);
+            }
         }
 
-        internal class TemplateAttributeDefinition(TypeInfo typeInfo, int nameID, object[]? value) : AAttributeDefinition(typeInfo, nameID, value)
+        internal class TemplateAttributeDefinition(TypeInfo typeInfo, int[] tags, int[] comments, int nameID, object[]? value) : AAttributeDefinition(typeInfo, tags, comments, nameID, value)
         {
             private static TypeInfo ConvertTemplatedType(TypeInfo typeInfo, Dictionary<int, TypeInfo> templateTypeGiven)
             {
@@ -69,20 +84,34 @@ namespace CorpseLib.Scripts.Context
                     return new(parameterType, TypeInfo.IsConst, ID);
             }
 
+            public override Parameter? Instantiate(Dictionary<int, TypeInfo> templateTypeGiven, Environment env)
+            {
+                TypeInfo resolvedTypeInfo = ConvertTemplatedType(TypeInfo, templateTypeGiven);
+                ATypeInstance? parameterType = env.Instantiate(resolvedTypeInfo);
+                if (parameterType == null)
+                    return null;
+                if (parameterType is VoidType)
+                    throw new ArgumentException("Parameter type cannot be void");
+                if (Value != null)
+                    return new(parameterType, TypeInfo.IsConst, ID, parameterType.InternalConvert(Value));
+                else
+                    return new(parameterType, TypeInfo.IsConst, ID);
+            }
+
         }
 
         //TODO Rework
         private readonly List<AAttributeDefinition> m_Attributes = [];
+        private readonly Signature m_Signature;
         private readonly int[] m_Templates;
-        private readonly int m_ID;
 
-        public int ID => m_ID;
+        public Signature Signature => m_Signature;
         public int[] Templates => m_Templates;
         internal AAttributeDefinition[] Attributes => [.. m_Attributes];
 
-        internal TypeDefinition(int id, int[] templates)
+        internal TypeDefinition(Signature signature, int[] templates)
         {
-            m_ID = id;
+            m_Signature = signature;
             m_Templates = templates;
         }
 
@@ -96,19 +125,19 @@ namespace CorpseLib.Scripts.Context
             return false;
         }
 
-        internal bool AddAttribute(TypeInfo typeInfo, int id, object[]? value)
+        internal bool AddAttribute(TypeInfo typeInfo, int[] tags, int[] comments, int id, object[]? value)
         {
             if (SearchAttribute(id))
                 return false;
-            m_Attributes.Add(new AttributeDefinition(typeInfo, id, value));
+            m_Attributes.Add(new AttributeDefinition(typeInfo, tags, comments, id, value));
             return true;
         }
 
-        internal bool AddTemplateAttribute(TypeInfo typeInfo, int id, object[]? value)
+        internal bool AddTemplateAttribute(TypeInfo typeInfo, int[] tags, int[] comments, int id, object[]? value)
         {
             if (SearchAttribute(id))
                 return false;
-            m_Attributes.Add(new TemplateAttributeDefinition(typeInfo, id, value));
+            m_Attributes.Add(new TemplateAttributeDefinition(typeInfo, tags, comments, id, value));
             return true;
         }
 
@@ -127,6 +156,28 @@ namespace CorpseLib.Scripts.Context
                 if (intance == null)
                 {
                     env.RemoveTemplateTypeInstance(typeInfo);
+                    return null;
+                }
+                type.AddAttribute(intance);
+            }
+            return type;
+        }
+
+        internal ATypeInstance? Instantiate(TypeInfo typeInfo, TypeObject typeObject, Environment env)
+        {
+            if (typeInfo.TemplateTypes.Length != m_Templates.Length)
+                throw new ArgumentException("Invalid number of template");
+            Dictionary<int, TypeInfo> templateDictionary = [];
+            for (int n = 0; n != m_Templates.Length; ++n)
+                templateDictionary[m_Templates[n]] = typeInfo.TemplateTypes[n];
+            ObjectType type = new(typeInfo);
+            typeObject.AddTemplateTypeInstance(typeInfo, type);
+            foreach (AAttributeDefinition attribute in m_Attributes)
+            {
+                Parameter? intance = attribute.Instantiate(templateDictionary, env);
+                if (intance == null)
+                {
+                    typeObject.RemoveTemplateTypeInstance(typeInfo);
                     return null;
                 }
                 type.AddAttribute(intance);

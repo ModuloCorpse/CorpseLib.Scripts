@@ -2,6 +2,8 @@
 using CorpseLib.Scripts.Type;
 using System.Diagnostics.CodeAnalysis;
 using CorpseLib.Scripts.Context;
+using CorpseLib.Scripts.Instruction;
+using Environment = CorpseLib.Scripts.Context.Environment;
 
 namespace CorpseLib.Scripts
 {
@@ -133,12 +135,12 @@ namespace CorpseLib.Scripts
 
             public void Add(TypeDefinition type)
             {
-                if (m_TemplateDefinitions.TryGetValue(type.ID, out TemplateDefinitionHolderTreeNode? node))
+                if (m_TemplateDefinitions.TryGetValue(type.Signature.ID, out TemplateDefinitionHolderTreeNode? node))
                     node.Add(type);
                 else
                 {
                     TemplateDefinitionHolderTreeNode newNode = new();
-                    m_TemplateDefinitions[type.ID] = newNode;
+                    m_TemplateDefinitions[type.Signature.ID] = newNode;
                     newNode.Add(type);
                 }
             }
@@ -159,17 +161,19 @@ namespace CorpseLib.Scripts
         private readonly TemplateInstanceHolder m_TemplateTypeInstances = new();
         private readonly Dictionary<int, ATypeInstance> m_TypeInstances = [];
         private readonly Dictionary<int, AFunction> m_Functions = [];
-        private readonly Dictionary<int, Parameter> m_Globals = [];
         private readonly Dictionary<int, Namespace> m_Namespaces = [];
+        private readonly List<AInstruction> m_Instructions = [];
+        public AInstruction[] Instructions => [.. m_Instructions];
 
         public TypeDefinition[] Definitions => [.. m_TemplateDefinitions.Values];
         public ATypeInstance[] TemplateTypeInstances => m_TemplateTypeInstances.Values;
         public ATypeInstance[] Instances => [.. m_TypeInstances.Values];
         public AFunction[] Functions => [.. m_Functions.Values];
-        public Parameter[] Globals => [.. m_Globals.Values];
         public Namespace[] Namespaces => [.. m_Namespaces.Values];
 
-        public void AddTemplateDefinition(TypeDefinition type) => m_TemplateDefinitions.Add(type);
+        public void AddInstruction(AInstruction instruction) => m_Instructions.Add(instruction);
+
+        public void AddTypeDefinition(TypeDefinition type) => m_TemplateDefinitions.Add(type);
 
         public void AddType(ATypeInstance type) => m_TypeInstances[type.TypeInfo.ID] = type;
 
@@ -181,14 +185,6 @@ namespace CorpseLib.Scripts
             if (m_Functions.ContainsKey(function.Signature.ID))
                 return false;
             m_Functions[function.Signature.ID] = function;
-            return true;
-        }
-
-        public bool AddGlobal(Parameter parameter)
-        {
-            if (m_Globals.ContainsKey(parameter.ID))
-                return false;
-            m_Globals[parameter.ID] = parameter;
             return true;
         }
 
@@ -246,5 +242,22 @@ namespace CorpseLib.Scripts
         }
 
         public ATypeInstance? Instantiate(TypeInfo typeInfo) => InternalInstantiate(typeInfo, 0, typeInfo.IsArray);
+
+        internal object? InternalExecute(Environment env)
+        {
+            FunctionStack stack = new();
+            foreach (AInstruction instruction in m_Instructions)
+            {
+                if (instruction is Break || instruction is Continue)
+                    return new();
+                else
+                {
+                    instruction.ExecuteInstruction(env, stack);
+                    if (stack.HasReturn)
+                        return new();
+                }
+            }
+            return stack.ReturnValue;
+        }
     }
 }

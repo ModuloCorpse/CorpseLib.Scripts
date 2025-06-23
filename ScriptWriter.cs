@@ -4,12 +4,14 @@ using CorpseLib.Scripts.Type;
 using CorpseLib.Scripts.Type.Primitive;
 using System.Text;
 using static CorpseLib.Scripts.Context.TypeDefinition;
+using static CorpseLib.Scripts.Context.TypeObject;
+using Environment = CorpseLib.Scripts.Context.Environment;
 
 namespace CorpseLib.Scripts
 {
     public static class ScriptWriter
     {
-        public static void AppendValue(ref StringBuilder sb, ATypeInstance typeInstance, object[]? value)
+        public static void AppendValue(ScriptBuilder sb, ATypeInstance typeInstance, object[]? value)
         {
             if (value == null || typeInstance is VoidType)
                 return;
@@ -27,7 +29,7 @@ namespace CorpseLib.Scripts
                         sb.Append(',');
                     sb.Append(' ');
                     if (value[i] is Variable var)
-                        AppendValue(ref sb, arrayType.ElementType, var.Values);
+                        AppendValue(sb, arrayType.ElementType, var.Values);
                     else
                         throw new ArgumentException("Array is not valid");
                 }
@@ -47,7 +49,7 @@ namespace CorpseLib.Scripts
                             if (i != 0)
                                 sb.Append(',');
                             sb.Append(' ');
-                            AppendValue(ref sb, var.Type, var.Values);
+                            AppendValue(sb, var.Type, var.Values);
                         }
                     }
                     else
@@ -61,7 +63,11 @@ namespace CorpseLib.Scripts
             {
                 object tmp = value[0];
                 if (typeInstance is StringType)
-                    sb.Append('"').Append(tmp).Append('"');
+                {
+                    sb.Append('"');
+                    sb.Append(tmp);
+                    sb.Append('"');
+                }
                 else if (typeInstance is BoolType && Helper.ChangeType(tmp, out bool b))
                     sb.Append(b ? "true" : "false");
                 //Using byte and sbyte to implicitly convert string to char
@@ -74,40 +80,40 @@ namespace CorpseLib.Scripts
             }
         }
 
-        private static void AppendParameter(ref StringBuilder sb, Parameter parameter, ConversionTable conversionTable)
+        private static void AppendParameter(ScriptBuilder sb, Parameter parameter)
         {
             if (parameter.IsConst)
                 sb.Append("const ");
-            AppendTypeInstanceName(ref sb, parameter.Type, conversionTable);
+            AppendTypeInstanceName(sb, parameter.Type);
             sb.Append(' ');
-            sb.Append(conversionTable.GetName(parameter.ID));
+            sb.AppendID(parameter.ID);
             if (parameter.DefaultValues != null)
             {
                 sb.Append(" = ");
-                AppendValue(ref sb, parameter.Type, parameter.DefaultValues);
+                AppendValue(sb, parameter.Type, parameter.DefaultValues);
             }
         }
 
-        public static void AppendObjectType(ref StringBuilder sb, ObjectType objectType, ConversionTable conversionTable)
+        public static void AppendObjectType(ScriptBuilder sb, ObjectType objectType)
         {
             sb.Append("struct ");
-            AppendTypeInfo(ref sb, objectType.TypeInfo, conversionTable);
+            AppendTypeInfo(sb, objectType.TypeInfo);
             sb.Append(" { ");
             foreach (Parameter attribute in objectType.Attributes)
             {
-                AppendParameter(ref sb, attribute, conversionTable);
+                AppendParameter(sb, attribute);
                 sb.Append("; ");
             }
             sb.Append('}');
         }
 
-        public static void AppendTypeInstanceName(ref StringBuilder sb, ATypeInstance typeInstance, ConversionTable conversionTable)
+        public static void AppendTypeInstanceName(ScriptBuilder sb, ATypeInstance typeInstance)
         {
             if (typeInstance is ObjectType objectType)
-                AppendTypeInfo(ref sb, objectType.TypeInfo, conversionTable);
+                AppendTypeInfo(sb, objectType.TypeInfo);
             else if (typeInstance is ArrayType arrayType)
             {
-                AppendTypeInstanceName(ref sb, arrayType.ElementType, conversionTable);
+                AppendTypeInstanceName(sb, arrayType.ElementType);
                 sb.Append("[]");
             }
             else if (typeInstance is VoidType)
@@ -138,29 +144,30 @@ namespace CorpseLib.Scripts
                 sb.Append("string");
         }
 
-        public static void AppendFunctionSignature(ref StringBuilder sb, FunctionSignature functionSignature, ConversionTable conversionTable)
+        public static void AppendFunctionSignature(ScriptBuilder sb, FunctionSignature functionSignature)
         {
             sb.Append("fct ");
             if (functionSignature.ReturnType is not VoidType)
             {
-                AppendTypeInstanceName(ref sb, functionSignature.ReturnType, conversionTable);
+                AppendTypeInstanceName(sb, functionSignature.ReturnType);
                 sb.Append(' ');
             }
-            sb.Append(string.Format("{0}(", conversionTable.GetName(functionSignature.ID)));
+            sb.AppendID(functionSignature.ID);
+            sb.Append('(');
             int i = 0;
             foreach (Parameter p in functionSignature.Parameters)
             {
                 if (i != 0)
                     sb.Append(", ");
-                AppendParameter(ref sb, p, conversionTable);
+                AppendParameter(sb, p);
                 ++i;
             }
             sb.Append(')');
         }
 
-        public static void AppendTypeDefinitionName(ref StringBuilder sb, TypeDefinition typeDefinition, ConversionTable conversionTable)
+        public static void AppendTypeDefinitionName(ScriptBuilder sb, TypeDefinition typeDefinition)
         {
-            sb.Append(conversionTable.GetName(typeDefinition.ID));
+            sb.AppendID(typeDefinition.Signature.ID);
             int[] templates = typeDefinition.Templates;
             if (templates.Length == 0)
                 return;
@@ -170,22 +177,27 @@ namespace CorpseLib.Scripts
             {
                 if (i != 0)
                     sb.Append(", ");
-                sb.Append(conversionTable.GetName(template));
+                sb.AppendID(template);
                 ++i;
             }
             sb.Append('>');
         }
 
-        public static void AppendTypeInfo(ref StringBuilder sb, TypeInfo typeInfo, ConversionTable conversionTable)
+        public static void AppendSignature(ScriptBuilder sb, Signature signature)
+        {
+            foreach (int namespaceID in signature.Namespaces)
+            {
+                sb.AppendID(namespaceID);
+                sb.Append('.');
+            }
+            sb.AppendID(signature.ID);
+        }
+
+        public static void AppendTypeInfo(ScriptBuilder sb, TypeInfo typeInfo)
         {
             if (typeInfo.IsConst)
                 sb.Append("const ");
-            foreach (int namespaceID in typeInfo.NamespacesID)
-            {
-                sb.Append(conversionTable.GetName(namespaceID));
-                sb.Append('.');
-            }
-            sb.Append(conversionTable.GetName(typeInfo.ID));
+            AppendSignature(sb, typeInfo.Signature);
             if (typeInfo.TemplateTypes.Length > 0)
             {
                 sb.Append('<');
@@ -194,7 +206,7 @@ namespace CorpseLib.Scripts
                 {
                     if (i != 0)
                         sb.Append(", ");
-                    AppendTypeInfo(ref sb, templatedType, conversionTable);
+                    AppendTypeInfo(sb, templatedType);
                     ++i;
                 }
                 sb.Append('>');
@@ -203,82 +215,173 @@ namespace CorpseLib.Scripts
                 sb.Append("[]");
         }
 
-        public static void AppendTypeDefinition(ref StringBuilder sb, TypeDefinition typeDefinition, ConversionTable conversionTable)
+        private static bool IsObject(object[] value)
+        {
+            foreach (object obj in value)
+            {
+                if (obj is not object[])
+                    return false;
+            }
+            return true;
+        }
+
+        public static void AppendValue(ScriptBuilder sb, object[]? value)
+        {
+            if (value == null)
+                return;
+            if (value.Length == 0)
+            {
+                sb.Append("null");
+                return;
+            }
+            else if (IsObject(value))
+            {
+                sb.Append('{');
+                for (int i = 0; i != value.Length; ++i)
+                {
+                    object[] var = (value[i] as object[])!;
+                    if (i != 0)
+                        sb.Append(',');
+                    sb.Append(' ');
+                    AppendValue(sb, var);
+                }
+                if (value.Length != 0)
+                    sb.Append(' ');
+                sb.Append('}');
+            }
+            else if (value.Length == 1)
+            {
+                object tmp = value[0];
+                if (tmp is List<object[]> elements)
+                {
+                    sb.Append('[');
+                    for (int i = 0; i != value.Length; ++i)
+                    {
+                        object[] var = (value[i] as object[])!;
+                        if (i != 0)
+                            sb.Append(',');
+                        sb.Append(' ');
+                        AppendValue(sb, var);
+                    }
+                    if (value.Length != 0)
+                        sb.Append(' ');
+                    sb.Append(']');
+                }
+                else if (tmp is string)
+                {
+                    sb.Append('"');
+                    sb.Append(tmp);
+                    sb.Append('"');
+                }
+                else if (tmp is bool && Helper.ChangeType(tmp, out bool b))
+                    sb.Append(b ? "true" : "false");
+                //Using sbyte to implicitly convert string to char
+                else if (tmp is char && Helper.ChangeType(tmp, out sbyte sB))
+                    sb.Append((char)sB);
+                else
+                    sb.Append(tmp);
+            }
+        }
+
+        public static void AppendTypeDefinition(ScriptBuilder sb, TypeDefinition typeDefinition)
         {
             sb.Append("struct ");
-            AppendTypeDefinitionName(ref sb, typeDefinition, conversionTable);
-            sb.Append(" { ");
+            AppendTypeDefinitionName(sb, typeDefinition);
+            sb.AppendLine();
+            sb.OpenScope();
+            int i = 0;
             foreach (AAttributeDefinition attribute in typeDefinition.Attributes)
             {
-                AppendTypeInfo(ref sb, attribute.TypeInfo, conversionTable);
+                if (i != 0)
+                    sb.AppendLine();
+                AppendTypeInfo(sb, attribute.TypeInfo);
                 sb.Append(' ');
-                sb.Append(conversionTable.GetName(attribute.ID));
+                sb.AppendID(attribute.ID);
                 if (attribute.Value != null)
                 {
                     sb.Append(" = ");
-                    sb.Append(attribute.Value);
+                    AppendValue(sb, attribute.Value);
                 }
-                sb.Append("; ");
+                sb.Append(';');
+                ++i;
             }
-            sb.Append('}');
+            sb.CloseScope();
         }
 
-        private static void AppendCondition(ref StringBuilder sb, Condition condition, ConversionTable conversionTable)
+        private static void AppendCondition(ScriptBuilder sb, Condition condition)
         {
             sb.Append(condition.ConditionStr);
         }
 
-        private static void AppendScopedInstructions(ref StringBuilder sb, ScopedInstructions instructions, ConversionTable conversionTable)
+        private static void AppendInstructions(ScriptBuilder sb, AInstruction[] instructions)
         {
-            if (instructions.Count > 1)
-                sb.Append(" {");
-            foreach (AInstruction instruction in instructions.Instructions)
+            int i = 0;
+            foreach (AInstruction instruction in instructions)
             {
-                sb.Append(' ');
-                AppendInstruction(ref sb, instruction, conversionTable);
+                if (i != 0)
+                    sb.AppendLine();
+                AppendInstruction(sb, instruction);
+                i++;
             }
-            if (instructions.Count > 1)
-                sb.Append(" }");
         }
 
-        private static void AppendDoWhile(ref StringBuilder sb, DoWhileInstruction doWhileInstruction, ConversionTable conversionTable)
+        private static void AppendScopedInstructions(ScriptBuilder sb, ScopedInstructions instructions)
+        {
+            if (instructions.Count > 1)
+                sb.OpenScope();
+            else
+            {
+                sb.Indent();
+                sb.AppendLine();
+            }
+            AppendInstructions(sb, instructions.Instructions);
+            if (instructions.Count > 1)
+                sb.CloseScope();
+            else
+                sb.Unindent();
+        }
+
+        private static void AppendDoWhile(ScriptBuilder sb, DoWhileInstruction doWhileInstruction)
         {
             sb.Append("do");
-            AppendScopedInstructions(ref sb, doWhileInstruction.Body, conversionTable);
-            sb.Append(" while(");
-            AppendCondition(ref sb, doWhileInstruction.Condition, conversionTable);
+            AppendScopedInstructions(sb, doWhileInstruction.Body);
+            sb.AppendLine();
+            sb.Append("while(");
+            AppendCondition(sb, doWhileInstruction.Condition);
             sb.Append(')');
         }
 
-        private static void AppendWhile(ref StringBuilder sb, WhileInstruction whileInstruction, ConversionTable conversionTable)
+        private static void AppendWhile(ScriptBuilder sb, WhileInstruction whileInstruction)
         {
             sb.Append("while(");
-            AppendCondition(ref sb, whileInstruction.Condition, conversionTable);
+            AppendCondition(sb, whileInstruction.Condition);
             sb.Append(')');
-            AppendScopedInstructions(ref sb, whileInstruction.Body, conversionTable);
+            AppendScopedInstructions(sb, whileInstruction.Body);
         }
 
-        private static void AppendIf(ref StringBuilder sb, IfInstruction ifInstruction, ConversionTable conversionTable)
+        private static void AppendIf(ScriptBuilder sb, IfInstruction ifInstruction)
         {
             sb.Append("if (");
-            AppendCondition(ref sb, ifInstruction.Condition, conversionTable);
+            AppendCondition(sb, ifInstruction.Condition);
             sb.Append(')');
-            AppendScopedInstructions(ref sb, ifInstruction.Body, conversionTable);
+            AppendScopedInstructions(sb, ifInstruction.Body);
             foreach (var elseIf in ifInstruction.Elifs)
             {
-                sb.Append(" elif (");
-                AppendCondition(ref sb, elseIf.Condition, conversionTable);
+                sb.AppendLine();
+                sb.Append("elif (");
+                AppendCondition(sb, elseIf.Condition);
                 sb.Append(')');
-                AppendScopedInstructions(ref sb, elseIf.Body, conversionTable);
+                AppendScopedInstructions(sb, elseIf.Body);
             }
             if (ifInstruction.ElseBody.Count > 0)
             {
-                sb.Append(" else");
-                AppendScopedInstructions(ref sb, ifInstruction.ElseBody, conversionTable);
+                sb.AppendLine();
+                sb.Append("else");
+                AppendScopedInstructions(sb, ifInstruction.ElseBody);
             }
         }
 
-        public static void AppendInstruction(ref StringBuilder sb, AInstruction instruction, ConversionTable conversionTable)
+        public static void AppendInstruction(ScriptBuilder sb, AInstruction instruction)
         {
             if (instruction is DebugInstruction debugInstruction)
             {
@@ -290,44 +393,137 @@ namespace CorpseLib.Scripts
             else if (instruction is Continue)
                 sb.Append("continue;");
             else if (instruction is DoWhileInstruction doWhileInstruction)
-                AppendDoWhile(ref sb, doWhileInstruction, conversionTable);
+                AppendDoWhile(sb, doWhileInstruction);
             else if (instruction is WhileInstruction whileInstruction)
-                AppendWhile(ref sb, whileInstruction, conversionTable);
+                AppendWhile(sb, whileInstruction);
             else if (instruction is IfInstruction ifInstruction)
-                AppendIf(ref sb, ifInstruction, conversionTable);
+                AppendIf(sb, ifInstruction);
         }
 
-        public static void AppendFunction(ref StringBuilder sb, Function function, ConversionTable conversionTable)
+        public static void AppendFunction(ScriptBuilder sb, Function function)
         {
-            AppendFunctionSignature(ref sb, function.Signature, conversionTable);
-            sb.Append(" {");
-            foreach (AInstruction instruction in function.Instructions)
+            AppendFunctionSignature(sb, function.Signature);
+            AInstruction[] instructions = function.Instructions;
+            if (instructions.Length == 0)
+                sb.Append(" {}");
+            else
             {
-                sb.Append(' ');
-                AppendInstruction(ref sb, instruction, conversionTable);
+                sb.AppendLine();
+                sb.OpenScope();
+                AppendInstructions(sb, instructions);
+                sb.CloseScope();
             }
-            sb.Append(" }");
         }
 
-        public static void AppendNamespaceName(ref StringBuilder sb, Namespace @namespace, ConversionTable conversionTable)
+        public static string GenerateNamespaceName(int[] namespaceIDs, ConversionTable conversionTable)
         {
+            StringBuilder sb = new();
             int i = 0;
-            foreach (int namespaceID in @namespace.IDS)
+            foreach (int namespaceID in namespaceIDs)
             {
                 if (i != 0)
                     sb.Append('.');
                 sb.Append(conversionTable.GetName(namespaceID));
                 ++i;
             }
+            return sb.ToString();
         }
 
-        public static void ToScriptString(ref StringBuilder sb, Namespace @namespace, ConversionTable conversionTable)
+        private static void AppendNamespaceToScriptString(ScriptBuilder sb, NamespaceObject @namespace)
         {
             sb.Append("namespace ");
-            sb.Append(conversionTable.GetName(@namespace.ID));
-            sb.Append(" { ");
-            //TODO
-            sb.Append('}');
+            sb.AppendID(@namespace.ID);
+            sb.AppendLine();
+            sb.OpenScope();
+            AppendEnvironmentDictionnaryToScriptString(sb, @namespace.Objects);
+            sb.CloseScope();
+        }
+
+        private static void AppendEnvironmentObjectToScriptString(ScriptBuilder sb, EnvironmentObject envObject)
+        {
+            int[] comments = envObject.Comments;
+            if (comments.Length != 0)
+            {
+                int n = 0;
+                foreach (int comment in comments)
+                {
+                    if (n != 0)
+                        sb.AppendLine();
+                    sb.AppendComment(comment);
+                    ++n;
+                }
+            }
+
+            int[] tags = envObject.Tags;
+            if (tags.Length != 0)
+            {
+                sb.Append('[');
+                int n = 0;
+                foreach (int tag in tags)
+                {
+                    if (n != 0)
+                        sb.Append(", ");
+                    sb.AppendID(tag);
+                    ++n;
+                }
+                sb.Append("] ");
+            }
+
+            if (envObject is NamespaceObject namespaceObject)
+                AppendNamespaceToScriptString(sb, namespaceObject);
+            else if (envObject is FunctionObject functionObj && functionObj.Function is Function function)
+                AppendFunction(sb, function);
+            else if (envObject is InstructionObject instructionObject)
+                AppendInstruction(sb, instructionObject.Instruction);
+            else if (envObject is TypeObject typeObject)
+            {
+                int n = 0;
+                foreach (TypeDefinitionObject typeDefinition in typeObject.Values)
+                {
+                    if (n != 0)
+                    {
+                        sb.AppendLine();
+                        sb.AppendLine();
+                    }
+                    AppendTypeDefinition(sb, typeDefinition.TypeDefinition);
+                    ++n;
+                }
+            }
+        }
+
+        private static void AppendEnvironmentDictionnaryToScriptString(ScriptBuilder sb, EnvironmentObjectDictionary dict)
+        {
+            int i = 0;
+            foreach (var obj in dict.Objects)
+            {
+                if (i != 0)
+                {
+                    sb.AppendLine();
+                    sb.AppendLine();
+                }
+                AppendEnvironmentObjectToScriptString(sb, obj);
+                ++i;
+            }
+
+            InstructionObject[] instructions = dict.InstructionObjects;
+            if (instructions.Length != 0)
+            {
+                sb.AppendLine();
+                sb.AppendLine();
+            }
+            int n = 0;
+            foreach (InstructionObject instruction in instructions)
+            {
+                if (n != 0)
+                    sb.AppendLine();
+                AppendEnvironmentObjectToScriptString(sb, instruction);
+                n++;
+            }
+        }
+
+        public static void ToScriptString(ScriptBuilder sb, Environment env)
+        {
+            AppendEnvironmentDictionnaryToScriptString(sb, env.Objects);
         }
     }
 }

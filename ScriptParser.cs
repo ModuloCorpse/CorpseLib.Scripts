@@ -2,7 +2,7 @@
 using CorpseLib.Scripts.Type;
 using System.Text;
 using CorpseLib.Scripts.Context;
-using CorpseLib.Scripts.Instruction;
+using CorpseLib.Scripts.Instructions;
 using CorpseLib.Scripts.Parser;
 using Environment = CorpseLib.Scripts.Context.Environment;
 
@@ -382,7 +382,7 @@ namespace CorpseLib.Scripts
                     {
                         --templateCount;
                         if (templateCount < 0)
-                            return new("Template error", string.Format("Bad template {0}", template));
+                            return new("Template error", $"Bad template {template}");
                     }
                     else if (c == '<')
                         ++templateCount;
@@ -397,7 +397,7 @@ namespace CorpseLib.Scripts
                         builder.Clear();
                     }
                     else
-                        return new("Template error", string.Format("Bad template {0}", template));
+                        return new("Template error", $"Bad template {template}");
                 }
                 else if (c == '<')
                 {
@@ -405,7 +405,7 @@ namespace CorpseLib.Scripts
                     builder.Append(c);
                 }
                 else if (c == '>')
-                    return new("Template error", string.Format("Bad template {0}", template));
+                    return new("Template error", $"Bad template {template}");
                 else if (!char.IsWhiteSpace(c))
                     builder.Append(c);
             }
@@ -595,7 +595,7 @@ namespace CorpseLib.Scripts
                 }
                 default:
                 {
-                    parsingContext.RegisterError("Misformated function signature string", string.Format("Bad signature : {0}", parametersStr));
+                    parsingContext.RegisterError("Misformated function signature string", $"Bad signature : {parametersStr}");
                     functionName = string.Empty;
                     return null;
                 }
@@ -622,7 +622,7 @@ namespace CorpseLib.Scripts
             ATypeInstance? returnType = env.Instantiate(returnTypeInfo.Result!);
             if (returnType == null)
             {
-                parsingContext.RegisterError("Misformated function signature string", string.Format("Unknown return type : {0}", returnTypeStr));
+                parsingContext.RegisterError("Misformated function signature string", $"Unknown return type : {returnTypeStr}");
                 return null;
             }
             return new(returnType, parsingContext.PushName(functionName), [.. parameters]);
@@ -654,13 +654,13 @@ namespace CorpseLib.Scripts
                 }
                 else
                 {
-                    parsingContext.RegisterError(errorMessage, string.Format("Bad condition in {0}", keyword));
+                    parsingContext.RegisterError(errorMessage, $"Bad condition in {keyword}");
                     return new(string.Empty, string.Empty);
                 }
             }
             if (str.Length == 0)
             {
-                parsingContext.RegisterError(errorMessage, string.Format("Empty body in {0}", keyword));
+                parsingContext.RegisterError(errorMessage, $"Empty body in {keyword}");
                 return new(string.Empty, string.Empty);
             }
             if (str[0] == '{')
@@ -668,13 +668,13 @@ namespace CorpseLib.Scripts
                 tuple = IsolateScope(str, '{', '}', out found);
                 if (!found)
                 {
-                    parsingContext.RegisterError(errorMessage, string.Format("Bad body in {0}", keyword));
+                    parsingContext.RegisterError(errorMessage, $"Bad body in {keyword}");
                     return new(string.Empty, string.Empty);
                 }
                 string body = tuple.Item2;
                 if (string.IsNullOrWhiteSpace(body))
                 {
-                    parsingContext.RegisterError(errorMessage, string.Format("Empty body in {0}", keyword));
+                    parsingContext.RegisterError(errorMessage, $"Empty body in {keyword}");
                     return new(string.Empty, string.Empty);
                 }
                 str = tuple.Item3;
@@ -685,13 +685,13 @@ namespace CorpseLib.Scripts
                 Tuple<string, string> instruction = NextInstruction(str, out found);
                 if (!found)
                 {
-                    parsingContext.RegisterError(errorMessage, string.Format("Bad body in {0}", keyword));
+                    parsingContext.RegisterError(errorMessage, $"Bad body in {keyword}");
                     return new(string.Empty, string.Empty);
                 }
                 string body = instruction.Item1 + ';';
                 if (string.IsNullOrWhiteSpace(body))
                 {
-                    parsingContext.RegisterError(errorMessage, string.Format("Empty body in {0}", keyword));
+                    parsingContext.RegisterError(errorMessage, $"Empty body in {keyword}");
                     return new(string.Empty, string.Empty);
                 }
                 str = instruction.Item2;
@@ -939,10 +939,12 @@ namespace CorpseLib.Scripts
             {
                 if (str.Length == 3)
                     return [str[1]];
+                else if (str.Length == 4 && str[1] == '\\')
+                    return [str[2]];
                 else
                 {
-                    parsingContext.RegisterError("Invalid script", string.Format("Invalid char : {0}", str));
-                    return [];
+                    parsingContext.RegisterWarning("Wrong delimiter for string", $"String delimited with char delimiter : {str}");
+                    return [str[1..^1]];
                 }
             }
             else
@@ -960,7 +962,7 @@ namespace CorpseLib.Scripts
                         else
                             return [value];
                     }
-                    parsingContext.RegisterError("Invalid script", string.Format("Cannot parse float value : {0}", str));
+                    parsingContext.RegisterError("Invalid script", $"Cannot parse float value : {str}");
                     return [];
                 }
                 else
@@ -1026,7 +1028,7 @@ namespace CorpseLib.Scripts
                     Tuple<string, string> structAttribute = NextInstruction(structContent, out bool foundAttribute);
                     if (!foundAttribute)
                     {
-                        parsingContext.RegisterError("Invalid script", string.Format("Bad structure definition for {0}", templateName));
+                        parsingContext.RegisterError("Invalid script", $"Bad structure definition for {templateName}");
                         return;
                     }
                     string attribute = structAttribute.Item1;
@@ -1038,7 +1040,7 @@ namespace CorpseLib.Scripts
                         return;
                     if (parameterParts.Length != 2 && parameterParts.Length != 3)
                     {
-                        parsingContext.RegisterError("Invalid script", string.Format("Bad structure definition for {0}", templateName));
+                        parsingContext.RegisterError("Invalid script", $"Bad structure definition for {templateName}");
                         return;
                     }
                     OperationResult<TypeInfo> attributeTypeInfoResult = TypeInfo.ParseStr(parameterParts[0], parsingContext.ConversionTable);
@@ -1116,13 +1118,13 @@ namespace CorpseLib.Scripts
                         str = scoped.Item3;
                         Function function = new(functionSignature);
                         //TODO
-                        List<AInstruction> functionBody = FunctionLoadBody(string.Format("Invalid function {0}", functionSignatureName), scoped.Item2, parsingContext);
+                        List<AInstruction> functionBody = FunctionLoadBody($"Invalid function {functionSignatureName}", scoped.Item2, parsingContext);
                         if (parsingContext.HasErrors)
                             return;
                         function.AddInstructions(functionBody);
                         if (!@namespace.AddFunction(function))
                         {
-                            parsingContext.RegisterError("Invalid script", string.Format("Function {0} already exist", functionSignatureName));
+                            parsingContext.RegisterError("Invalid script", $"Function {functionSignatureName} already exist");
                             return;
                         }
                     }
@@ -1183,7 +1185,7 @@ namespace CorpseLib.Scripts
                 return;
             if (!env.AddNamespace(@namespace))
             {
-                parsingContext.RegisterError("Invalid script", string.Format("Namespace {0} already exist", ScriptWriter.GenerateNamespaceName(parsingContext.Namespaces, parsingContext.ConversionTable)));
+                parsingContext.RegisterError("Invalid script", $"Namespace {ScriptWriter.GenerateNamespaceName(parsingContext.Namespaces, parsingContext.ConversionTable)} already exist");
                 return;
             }
             return;

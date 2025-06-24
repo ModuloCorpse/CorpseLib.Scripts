@@ -44,6 +44,13 @@ namespace CorpseLib.Scripts.Parser.Instruction
                         sb.Append(input[i++]);
                     m_Tokens.Add(new(sb.ToString()));
                 }
+                else if (c == '.')
+                {
+                    sb.Clear();
+                    while (i < input.Length && char.IsDigit(input[i]))
+                        sb.Append(input[i++]);
+                    m_Tokens.Add(new(sb.ToString()));
+                }
                 else if (c == '"')
                 {
                     sb.Clear();
@@ -54,6 +61,20 @@ namespace CorpseLib.Scripts.Parser.Instruction
                         char ch = input[i++];
                         sb.Append(ch);
                         if (ch == '"' && sb[^2] != '\\')
+                            break;
+                    }
+                    m_Tokens.Add(new(sb.ToString()));
+                }
+                else if (c == '\'')
+                {
+                    sb.Clear();
+                    sb.Append(c);
+                    i++;
+                    while (i < input.Length)
+                    {
+                        char ch = input[i++];
+                        sb.Append(ch);
+                        if (ch == '\'' && sb[^2] != '\\')
                             break;
                     }
                     m_Tokens.Add(new(sb.ToString()));

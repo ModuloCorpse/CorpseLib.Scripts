@@ -1,9 +1,10 @@
-﻿namespace CorpseLib.Scripts.Parser.Instruction
+﻿namespace CorpseLib.Scripts.Parser.Instruction.Expressions
 {
     public class BinaryExpression(string op, AExpression left, AExpression right) : AExpression
     {
         public string Operator = op;
-        public AExpression Left = left, Right = right;
+        public AExpression Left = left;
+        public AExpression Right = right;
 
         internal override void Dump(ConversionTable conversionTable, string str)
         {

@@ -30,7 +30,7 @@ namespace CorpseLib.Scripts
                     {
                         --templateCount;
                         if (templateCount < 0)
-                            return new("Template error", string.Format("Bad template {0}", template));
+                            return new("Template error", $"Bad template {template}");
                     }
                     else if (c == '<')
                         ++templateCount;
@@ -45,7 +45,7 @@ namespace CorpseLib.Scripts
                         builder.Clear();
                     }
                     else
-                        return new("Template error", string.Format("Bad template {0}", template));
+                        return new("Template error", $"Bad template {template}");
                 }
                 else if (c == '<')
                 {
@@ -53,7 +53,7 @@ namespace CorpseLib.Scripts
                     builder.Append(c);
                 }
                 else if (c == '>')
-                    return new("Template error", string.Format("Bad template {0}", template));
+                    return new("Template error", $"Bad template {template}");
                 else
                     builder.Append(c);
             }
@@ -97,7 +97,7 @@ namespace CorpseLib.Scripts
                     }
                 }
                 else
-                    return new("Parsed type error", string.Format("Non-closing template in {0}", typeToParse));
+                    return new("Parsed type error", $"Non-closing template in {typeToParse}");
             }
             List<int> namespaceIDs = [];
             int idx = str.IndexOf('.');
@@ -105,7 +105,7 @@ namespace CorpseLib.Scripts
             {
                 string namespaceName = str[..idx];
                 if (string.IsNullOrEmpty(namespaceName))
-                    return new("Parsed type error", string.Format("Empty namespace in {0}", typeToParse));
+                    return new("Parsed type error", $"Empty namespace in {typeToParse}");
                 namespaceIDs.Add(conversionTable.PushName(namespaceName));
                 str = str[(idx + 1)..];
                 idx = str.IndexOf('.');

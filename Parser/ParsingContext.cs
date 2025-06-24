@@ -1,5 +1,5 @@
 ﻿using CorpseLib.Scripts.Context;
-using CorpseLib.Scripts.Instruction;
+using CorpseLib.Scripts.Instructions;
 using CorpseLib.Scripts.Type;
 using Environment = CorpseLib.Scripts.Context.Environment;
 
@@ -24,7 +24,7 @@ namespace CorpseLib.Scripts.Parser
 
         public void RegisterError(string error, string description)
         {
-            m_Error = string.Format("ERROR : {0} : {1}", error, description);
+            m_Error = $"ERROR : {error} : {description}";
             m_HasErrors = true;
         }
 

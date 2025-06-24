@@ -2,7 +2,7 @@
 using CorpseLib.Scripts.Type;
 using System.Diagnostics.CodeAnalysis;
 using CorpseLib.Scripts.Context;
-using CorpseLib.Scripts.Instruction;
+using CorpseLib.Scripts.Instructions;
 using Environment = CorpseLib.Scripts.Context.Environment;
 
 namespace CorpseLib.Scripts

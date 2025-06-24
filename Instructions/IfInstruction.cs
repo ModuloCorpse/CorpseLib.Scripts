@@ -1,6 +1,6 @@
 ﻿using Environment = CorpseLib.Scripts.Context.Environment;
 
-namespace CorpseLib.Scripts.Instruction
+namespace CorpseLib.Scripts.Instructions
 {
     public class IfInstruction(Condition condition, List<AInstruction> body) : AConditionalInstruction(condition, body)
     {

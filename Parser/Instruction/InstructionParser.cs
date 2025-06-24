@@ -1,4 +1,6 @@
-﻿namespace CorpseLib.Scripts.Parser.Instruction
+﻿using CorpseLib.Scripts.Parser.Instruction.Expressions;
+
+namespace CorpseLib.Scripts.Parser.Instruction
 {
     public partial class InstructionParser
     {
@@ -8,7 +10,7 @@
             string[] nameParts = token.Token.Split('.');
             foreach (string part in nameParts)
                 ids.Add(parsingContext.PushName(part));
-            return ids.ToArray();
+            return [..ids];
         }
 
         public static OperationResult<AExpression> Parse(string input, ParsingContext parsingContext)
@@ -26,7 +28,11 @@
             }
             else if (currentToken.IsIdentifier && (tokens[1]?.IsIdentifier ?? false) && tokens[2]?.Token == "=")
             {
-                string type = currentToken.Token;
+                string typeStr = currentToken.Token;
+                OperationResult<TypeInfo> typeInfoResult = TypeInfo.ParseStr(typeStr, parsingContext.ConversionTable);
+                if (!typeInfoResult)
+                    return typeInfoResult.Cast<AExpression>();
+                TypeInfo type = typeInfoResult.Result!;
                 tokens.Pop();
                 int[] nameIDs = ConvertNameFromToken(tokens.Current!, parsingContext);
                 tokens.Pop();
@@ -46,8 +52,8 @@
                 OperationResult<AExpression> exprResult = ParseExpression(tokens, parsingContext);
                 if (!exprResult)
                     return exprResult;
-                AExpression expr = exprResult.Result!;
-                return new(new CompoundAssignmentExpression(nameIDs, op, expr));
+                BinaryExpression binaryExpression = new(op, new VariableExpression(nameIDs), exprResult.Result!);
+                return new(new AssignmentExpression(null, nameIDs, binaryExpression));
             }
             else if (currentToken.IsIdentifier && tokens[1]?.Token == "=")
             {
@@ -135,12 +141,68 @@
                     return operand;
                 return new(new UnaryExpression(op, operand.Result!));
             }
+            else if (tokens.Current?.Token == "{")
+            {
+                tokens.Pop();
+                List<AExpression> parameters = [];
+                if (tokens.Current.Token != "}")
+                {
+                    OperationResult<AExpression> parameterResult = ParseExpression(tokens, parsingContext);
+                    if (!parameterResult)
+                        return parameterResult;
+                    parameters.Add(parameterResult.Result!);
+                    while (tokens.Current?.Token == ",")
+                    {
+                        tokens.Pop();
+                        if (tokens.Current != null)
+                        {
+                            parameterResult = ParseExpression(tokens, parsingContext);
+                            if (!parameterResult)
+                                return parameterResult;
+                            parameters.Add(parameterResult.Result!);
+                        }
+                    }
+                }
+                if (tokens.Current?.Token != "}")
+                    return new("Error while parsing instruction", $"Expected '}}' but found '{tokens.Current}'");
+                tokens.Pop();
+                //TODO Handle when AnonymousObjectExpression is composed only of literals
+                return new(new AnonymousObjectExpression(parameters, false));
+            }
+            else if (tokens.Current?.Token == "[")
+            {
+                tokens.Pop();
+                List<AExpression> parameters = [];
+                if (tokens.Current.Token != "]")
+                {
+                    OperationResult<AExpression> parameterResult = ParseExpression(tokens, parsingContext);
+                    if (!parameterResult)
+                        return parameterResult;
+                    parameters.Add(parameterResult.Result!);
+                    while (tokens.Current?.Token == ",")
+                    {
+                        tokens.Pop();
+                        if (tokens.Current != null)
+                        {
+                            parameterResult = ParseExpression(tokens, parsingContext);
+                            if (!parameterResult)
+                                return parameterResult;
+                            parameters.Add(parameterResult.Result!);
+                        }
+                    }
+                }
+                if (tokens.Current?.Token != "]")
+                    return new("Error while parsing instruction", $"Expected ']' but found '{tokens.Current}'");
+                tokens.Pop();
+                //TODO Handle when AnonymousObjectExpression is composed only of literals
+                return new(new AnonymousObjectExpression(parameters, true));
+            }
             else if (currentToken.Token == "(")
             {
                 tokens.Pop();
                 OperationResult<AExpression> expr = ParseExpression(tokens, parsingContext);
                 if (tokens.Current?.Token != ")")
-                    throw new Exception($"Expected ')' but found '{tokens.Current}'");
+                    return new("Error while parsing instruction", $"Expected ')' but found '{tokens.Current}'");
                 tokens.Pop();
                 return expr;
             }
@@ -159,7 +221,7 @@
                 if (tokens.Current?.Token == "(")
                 {
                     tokens.Pop();
-                    var args = new List<AExpression>();
+                    List<AExpression> args = [];
                     if (tokens.Current.Token != ")")
                     {
                         OperationResult<AExpression> argResult = ParseExpression(tokens, parsingContext);
@@ -179,7 +241,7 @@
                         }
                     }
                     if (tokens.Current?.Token != ")")
-                        throw new Exception($"Expected ')' but found '{tokens.Current}'");
+                        return new("Error while parsing instruction", $"Expected ')' but found '{tokens.Current}'");
                     tokens.Pop();
                     return new(new FunctionCallExpression(nameIDs, args));
                 }
@@ -192,7 +254,7 @@
                 }
                 return new(expr);
             }
-            throw new Exception($"Unexpected token: {tokens.Current}");
+            return new("Error while parsing instruction", $"Unexpected token: {tokens.Current}");
         }
     }
 }

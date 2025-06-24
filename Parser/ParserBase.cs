@@ -10,11 +10,11 @@
         public string Error => m_Error;
         public bool HasError => m_HasError;
 
-        protected void RegisterWarning(string warning, string description) => m_Warnings.Add(string.Format("WARNING : {0} : {1}", warning, description));
+        protected void RegisterWarning(string warning, string description) => m_Warnings.Add($"WARNING : {warning} : {description}");
 
         protected void RegisterError(string error, string description)
         {
-            m_Error = string.Format("ERROR : {0} : {1}", error, description);
+            m_Error = $"ERROR : {error} : {description}";
             m_HasError = true;
         }
 

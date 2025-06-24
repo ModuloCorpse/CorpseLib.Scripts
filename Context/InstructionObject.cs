@@ -1,4 +1,4 @@
-﻿using CorpseLib.Scripts.Instruction;
+﻿using CorpseLib.Scripts.Instructions;
 
 namespace CorpseLib.Scripts.Context
 {

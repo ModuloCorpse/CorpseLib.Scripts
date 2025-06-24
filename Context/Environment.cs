@@ -1,6 +1,6 @@
 ﻿using CorpseLib.Scripts.Type.Primitive;
 using CorpseLib.Scripts.Type;
-using CorpseLib.Scripts.Instruction;
+using CorpseLib.Scripts.Instructions;
 
 namespace CorpseLib.Scripts.Context
 {

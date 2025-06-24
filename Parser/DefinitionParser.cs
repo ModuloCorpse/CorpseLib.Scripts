@@ -154,7 +154,7 @@ namespace CorpseLib.Scripts.Parser
                         {
                             if (namespaceDefinition.Name == newStructDefinition.Name)
                             {
-                                RegisterError("Invalid script", string.Format("Structure {0} already exist", newStructDefinition.Name));
+                                RegisterError("Invalid script", $"Structure {newStructDefinition.Name} already exist");
                                 return;
                             }
                         }
@@ -173,7 +173,7 @@ namespace CorpseLib.Scripts.Parser
                         {
                             if (namespaceDefinition.Name == childNamespace.Name)
                             {
-                                RegisterError("Invalid script", string.Format("Namespace {0} already exist", childNamespace.Name));
+                                RegisterError("Invalid script", $"Namespace {childNamespace.Name} already exist");
                                 return;
                             }
                         }
@@ -196,7 +196,7 @@ namespace CorpseLib.Scripts.Parser
                             return;
                         if (!@namespace.AddGlobal(global!))
                         {
-                            RegisterError("Invalid script", string.Format("Variable {0} already exist", global!.ID));
+                            RegisterError("Invalid script", $"Variable {global!.ID} already exist");
                             return;
                         }
                         str = instruction.Item2;*/

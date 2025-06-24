@@ -1,4 +1,4 @@
-﻿namespace CorpseLib.Scripts.Parser.Instruction
+﻿namespace CorpseLib.Scripts.Parser.Instruction.Expressions
 {
     public class LiteralExpression(string value) : AExpression
     {

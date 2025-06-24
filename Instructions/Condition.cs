@@ -1,4 +1,4 @@
-﻿namespace CorpseLib.Scripts.Instruction
+﻿namespace CorpseLib.Scripts.Instructions
 {
     public class Condition(string condition)
     {

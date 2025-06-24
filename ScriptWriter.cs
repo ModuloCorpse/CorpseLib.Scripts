@@ -1,5 +1,5 @@
 ﻿using CorpseLib.Scripts.Context;
-using CorpseLib.Scripts.Instruction;
+using CorpseLib.Scripts.Instructions;
 using CorpseLib.Scripts.Type;
 using CorpseLib.Scripts.Type.Primitive;
 using System.Text;

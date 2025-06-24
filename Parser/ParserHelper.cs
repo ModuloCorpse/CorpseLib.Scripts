@@ -1,33 +1,7 @@
 ﻿namespace CorpseLib.Scripts.Parser
 {
-    internal class ParserBase
+    internal static class ParserHelper
     {
-        private readonly List<string> m_Warnings = [];
-        private string m_Error = string.Empty;
-        private bool m_HasError = false;
-
-        public string[] Warnings => [..m_Warnings];
-        public string Error => m_Error;
-        public bool HasError => m_HasError;
-
-        protected void RegisterWarning(string warning, string description) => m_Warnings.Add($"WARNING : {warning} : {description}");
-
-        protected void RegisterError(string error, string description)
-        {
-            m_Error = $"ERROR : {error} : {description}";
-            m_HasError = true;
-        }
-
-        protected void RegisterOtherBase(ParserBase other)
-        {
-            m_Warnings.AddRange(other.Warnings);
-            if (!m_HasError)
-            {
-                m_Error = other.m_Error;
-                m_HasError = other.m_HasError;
-            }
-        }
-
         internal static Tuple<string, string, string> IsolateScope(string str, char open, char close, out bool found)
         {
             int openScopeIdx = str.IndexOf(open);
@@ -66,6 +40,41 @@
             }
             found = false;
             return new(str, string.Empty, string.Empty);
+        }
+
+        internal static Tuple<string, string> NextInstruction(string str, out bool found)
+        {
+            bool inString = false;
+            char stringChar = '\0';
+            for (int i = 0; i != str.Length; ++i)
+            {
+                char c = str[i];
+                if (inString)
+                {
+                    if (c == stringChar)
+                        inString = false;
+                }
+                else if (c == '"' || c == '\'')
+                {
+                    inString = true;
+                    stringChar = c;
+                }
+                else if (c == ';')
+                {
+                    found = true;
+                    string instruction = str[..i];
+                    if (instruction.Length > 0 && instruction[^1] == ' ')
+                        instruction = instruction[..^1];
+                    string ret = string.Empty;
+                    if ((i + 1) != str.Length)
+                        ret = str[(i + 1)..];
+                    if (ret.Length > 0 && ret[0] == ' ')
+                        ret = ret[1..];
+                    return new(instruction, ret);
+                }
+            }
+            found = false;
+            return new(string.Empty, string.Empty);
         }
     }
 }

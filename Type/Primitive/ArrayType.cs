@@ -1,4 +1,5 @@
-﻿using System.Text;
+﻿using CorpseLib.Scripts.Parser;
+using System.Text;
 
 namespace CorpseLib.Scripts.Type.Primitive
 {
@@ -9,30 +10,6 @@ namespace CorpseLib.Scripts.Type.Primitive
         public ATypeInstance ElementType => m_ElementType;
 
         internal ArrayType(ATypeInstance arrayType) : base() => m_ElementType = arrayType;
-
-        private static string[] SplitArray(string str)
-        {
-            List<string> ret = [];
-            while (!string.IsNullOrEmpty(str))
-            {
-                Tuple<string, string> split = ScriptParser.NextElement(str, '[', ']');
-                ret.Add(split.Item1);
-                str = split.Item2;
-            }
-            return [.. ret];
-        }
-
-        private static string[] SplitObjects(string str)
-        {
-            List<string> ret = [];
-            while (!string.IsNullOrEmpty(str))
-            {
-                Tuple<string, string> split = ScriptParser.NextElement(str, '{', '}');
-                ret.Add(split.Item1);
-                str = split.Item2;
-            }
-            return [.. ret];
-        }
 
         public override object[]? Convert(object[] value)
         {

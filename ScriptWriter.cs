@@ -225,7 +225,7 @@ namespace CorpseLib.Scripts
             return true;
         }
 
-        public static void AppendValue(ScriptBuilder sb, object[]? value)
+        public static void AppendAnonymousValue(ScriptBuilder sb, object[]? value)
         {
             if (value == null)
                 return;
@@ -243,7 +243,7 @@ namespace CorpseLib.Scripts
                     if (i != 0)
                         sb.Append(',');
                     sb.Append(' ');
-                    AppendValue(sb, var);
+                    AppendAnonymousValue(sb, var);
                 }
                 if (value.Length != 0)
                     sb.Append(' ');
@@ -261,7 +261,7 @@ namespace CorpseLib.Scripts
                         if (i != 0)
                             sb.Append(',');
                         sb.Append(' ');
-                        AppendValue(sb, var);
+                        AppendAnonymousValue(sb, var);
                     }
                     if (value.Length != 0)
                         sb.Append(' ');
@@ -300,7 +300,7 @@ namespace CorpseLib.Scripts
                 if (attribute.Value != null)
                 {
                     sb.Append(" = ");
-                    AppendValue(sb, attribute.Value);
+                    AppendAnonymousValue(sb, attribute.Value);
                 }
                 sb.Append(';');
                 ++i;

@@ -17,6 +17,7 @@ namespace CorpseLib.Scripts.Parser.Instruction
                 return null;
             }
         }
+
         public ExpressionToken? Current => m_Tokens.Count > m_Position ? m_Tokens[m_Position] : null;
         public bool HasNext => m_Position < m_Tokens.Count;
 

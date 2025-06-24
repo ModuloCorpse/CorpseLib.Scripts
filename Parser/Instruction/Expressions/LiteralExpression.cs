@@ -1,14 +1,16 @@
 ﻿namespace CorpseLib.Scripts.Parser.Instruction.Expressions
 {
-    public class LiteralExpression(string value) : AExpression
+    public class LiteralExpression(object[] value) : AExpression
     {
-        public string Value = value;
+        public object[] Value = value;
 
         internal override void Dump(ConversionTable conversionTable, string str)
         {
             Console.Write(str);
             Console.Write("- Literal: ");
-            Console.WriteLine(Value);
+            ScriptBuilder sb = new(conversionTable);
+            ScriptWriter.AppendAnonymousValue(sb, Value);
+            Console.WriteLine(sb.ToString());
         }
     }
 }

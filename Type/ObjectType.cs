@@ -19,23 +19,7 @@ namespace CorpseLib.Scripts.Type
             return true;
         }
 
-        private static Tuple<string, string> IsolateFirstElem(string str)
-        {
-            for (int i = 0; i < str.Length; ++i)
-            {
-                if (str[i] == ',')
-                {
-                    string elem = str[..i];
-                    string ret = str[(i + 1)..];
-                    if (ret.Length > 0 && ret[0] == ' ')
-                        ret = ret[1..];
-                    return new(elem, ret);
-                }
-            }
-            return new(str, string.Empty);
-        }
-
-        private bool CheckObject(object[] value)
+        private static bool CheckObject(object[] value)
         {
             foreach (object obj in value)
             {

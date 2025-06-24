@@ -118,6 +118,22 @@ namespace CorpseLib.Scripts.Parser.Instruction
             return new(left);
         }
 
+        private static bool IsExpressionLiteral(AExpression expr)
+        {
+            if (expr is LiteralExpression)
+                return true;
+            else if (expr is AnonymousObjectExpression anonymousObjectExpression)
+            {
+                foreach (AExpression parameter in anonymousObjectExpression.Parameters)
+                {
+                    if (!IsExpressionLiteral(parameter))
+                        return false;
+                }
+                return true;
+            }
+            return false;
+        }
+
         private static OperationResult<AExpression> ParsePrimary(TokenReader tokens, ParsingContext parsingContext)
         {
             ExpressionToken? currentToken = tokens.Current;
@@ -210,7 +226,7 @@ namespace CorpseLib.Scripts.Parser.Instruction
             {
                 string literal = currentToken.Token;
                 tokens.Pop();
-                return new(new LiteralExpression(literal));
+                return new(new LiteralExpression(ValueParser.ParseValue(literal, parsingContext)));
             }
             else if (currentToken.IsIdentifier)
             {

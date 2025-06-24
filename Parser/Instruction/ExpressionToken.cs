@@ -1,4 +1,4 @@
-﻿namespace CorpseLib.Scripts.Parser
+﻿namespace CorpseLib.Scripts.Parser.Instruction
 {
     public class ExpressionToken(string token)
     {

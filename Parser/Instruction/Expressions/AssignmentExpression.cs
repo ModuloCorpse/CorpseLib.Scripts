@@ -15,7 +15,7 @@
             {
                 ScriptBuilder sb = new(conversionTable);
                 ScriptWriter.AppendTypeInfo(sb, TypeName);
-                Console.Write($",Type={TypeName}");
+                Console.Write($",Type={sb}");
             }
             Console.WriteLine(']');
             Value.Dump(conversionTable, str + "   ");

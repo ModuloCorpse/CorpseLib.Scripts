@@ -77,31 +77,22 @@ namespace CorpseLib.Scripts.Parser.Instruction
             return ParseExpression(tokens, parsingContext);
         }
 
-        private static OperationResult<AExpression> ParseExpression(TokenReader tokens, ParsingContext parsingContext, int precedence = 0)
+        private static OperationResult<AExpression> ParseExpression(TokenReader tokens, ParsingContext parsingContext, int weight = 0)
         {
-            OperationResult<AExpression> leftResult = ParsePrimary(tokens, parsingContext);
+            OperationResult<AExpression> leftResult = ParsePrimary(tokens, parsingContext, false);
             if (!leftResult)
                 return leftResult;
             AExpression left = leftResult.Result!;
             while (tokens.HasNext)
             {
-                string op = tokens.Current!.Token;
-                int prec = op switch
-                {
-                    "=" => 0,
-                    "||" => 1,
-                    "&&" => 2,
-                    "==" or "!=" => 3,
-                    "<" or ">" or "<=" or ">=" => 4,
-                    "+" or "-" => 5,
-                    "*" or "/" or "%" => 6,
-                    _ => -1
-                };
-                if (prec < precedence || prec < 0)
+                ExpressionToken nextToken = tokens.Current!;
+                string op = nextToken.Token;
+                int tokenWeight = nextToken.Weight;
+                if (tokenWeight < weight || tokenWeight < 0)
                     break;
                 tokens.Pop();
-                int nextPrecedence = prec + (op == "=" ? 0 : 1);
-                OperationResult<AExpression> rightResult = ParseExpression(tokens, parsingContext, nextPrecedence);
+                int nextWeight = tokenWeight + (op == "=" ? 0 : 1);
+                OperationResult<AExpression> rightResult = ParseExpression(tokens, parsingContext, nextWeight);
                 if (!rightResult)
                     return rightResult;
                 AExpression right = rightResult.Result!;
@@ -134,7 +125,7 @@ namespace CorpseLib.Scripts.Parser.Instruction
             return false;
         }
 
-        private static OperationResult<AExpression> ParsePrimary(TokenReader tokens, ParsingContext parsingContext)
+        private static OperationResult<AExpression> ParsePrimary(TokenReader tokens, ParsingContext parsingContext, bool isReversed)
         {
             ExpressionToken? currentToken = tokens.Current;
             if (currentToken == null)
@@ -143,7 +134,7 @@ namespace CorpseLib.Scripts.Parser.Instruction
             {
                 string op = currentToken.Token;
                 tokens.Pop();
-                OperationResult<AExpression> target = ParsePrimary(tokens, parsingContext);
+                OperationResult<AExpression> target = ParsePrimary(tokens, parsingContext, false);
                 if (!target)
                     return target;
                 return new(new UnaryMutationExpression(target.Result!, op, true));
@@ -152,10 +143,14 @@ namespace CorpseLib.Scripts.Parser.Instruction
             {
                 string op = currentToken.Token;
                 tokens.Pop();
-                OperationResult<AExpression> operand = ParsePrimary(tokens, parsingContext);
-                if (!operand)
-                    return operand;
-                return new(new UnaryExpression(op, operand.Result!));
+                bool isNegative = (op == "-");
+                OperationResult<AExpression> operandResult = ParsePrimary(tokens, parsingContext, isNegative);
+                if (!operandResult)
+                    return operandResult;
+                AExpression operand = operandResult.Result!;
+                if (isNegative && operand is LiteralExpression literal && literal.Value.Length == 1 && literal.Value[0] is not string)
+                    return new(operand);
+                return new(new UnaryExpression(op, operand));
             }
             else if (tokens.Current?.Token == "{")
             {
@@ -225,6 +220,8 @@ namespace CorpseLib.Scripts.Parser.Instruction
             else if (currentToken.IsLiteral)
             {
                 string literal = currentToken.Token;
+                if (isReversed)
+                    literal = $"-{literal}";
                 tokens.Pop();
                 return new(new LiteralExpression(ValueParser.ParseValue(literal, parsingContext)));
             }
@@ -234,6 +231,29 @@ namespace CorpseLib.Scripts.Parser.Instruction
                 tokens.Pop();
                 if (!tokens.HasNext)
                     return new(new VariableExpression(nameIDs));
+                List<int[]> templates = [];
+                if (tokens.Current?.Token == "<")
+                {
+                    tokens.Pop();
+                    if (tokens.Current.Token != ">")
+                    {
+                        int[] templateIDs = ConvertNameFromToken(tokens.Current!, parsingContext);
+                        templates.Add(templateIDs);
+                        while (tokens.Current?.Token == ",")
+                        {
+                            tokens.Pop();
+                            if (tokens.Current != null)
+                            {
+                                templateIDs = ConvertNameFromToken(tokens.Current!, parsingContext);
+                                templates.Add(templateIDs);
+                            }
+                        }
+                    }
+                    if (tokens.Current?.Token != ">")
+                        return new("Error while parsing instruction", $"Expected '>' but found '{tokens.Current}'");
+                    tokens.Pop();
+                }
+
                 if (tokens.Current?.Token == "(")
                 {
                     tokens.Pop();

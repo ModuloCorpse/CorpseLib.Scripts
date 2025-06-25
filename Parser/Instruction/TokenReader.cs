@@ -4,7 +4,6 @@ namespace CorpseLib.Scripts.Parser.Instruction
 {
     public class TokenReader
     {
-        static readonly string[] multiCharOps = ["==", "!=", "<=", ">=", "&&", "||", "+=", "-=", "*=", "/=", "%=", "&=", "|=", "^=", "<<=", ">>=", "++", "--"];
         private readonly List<ExpressionToken> m_Tokens = [];
         private int m_Position = 0;
 
@@ -23,6 +22,7 @@ namespace CorpseLib.Scripts.Parser.Instruction
 
         public TokenReader(string input)
         {
+            OperatorsContainer operatorsHelper = new();
             StringBuilder sb = new();
             int i = 0;
             while (i < input.Length)
@@ -33,24 +33,34 @@ namespace CorpseLib.Scripts.Parser.Instruction
                 else if (char.IsLetter(c) || c == '_')
                 {
                     sb.Clear();
+                    sb.Append(c);
+                    i++;
                     while (i < input.Length && (char.IsLetterOrDigit(input[i]) || input[i] == '_' ||
                         (sb.Length != 0 && (input[i] == '.' || input[i] == '<' || input[i] == '>'))))
                         sb.Append(input[i++]);
-                    m_Tokens.Add(new(sb.ToString()));
+                    string token = sb.ToString();
+                    if (token == "null")
+                        m_Tokens.Add(new(sb.ToString(), null, false, true));
+                    else
+                        m_Tokens.Add(new(sb.ToString(), null, true, false));
                 }
                 else if (char.IsDigit(c))
                 {
                     sb.Clear();
+                    sb.Append(c);
+                    i++;
                     while (i < input.Length && (char.IsDigit(input[i]) || input[i] == '.'))
                         sb.Append(input[i++]);
-                    m_Tokens.Add(new(sb.ToString()));
+                    m_Tokens.Add(new(sb.ToString(), null, false, true));
                 }
                 else if (c == '.')
                 {
                     sb.Clear();
+                    sb.Append(c);
+                    i++;
                     while (i < input.Length && char.IsDigit(input[i]))
                         sb.Append(input[i++]);
-                    m_Tokens.Add(new(sb.ToString()));
+                    m_Tokens.Add(new(sb.ToString(), null, false, true));
                 }
                 else if (c == '"')
                 {
@@ -64,7 +74,7 @@ namespace CorpseLib.Scripts.Parser.Instruction
                         if (ch == '"' && sb[^2] != '\\')
                             break;
                     }
-                    m_Tokens.Add(new(sb.ToString()));
+                    m_Tokens.Add(new(sb.ToString(), null, false, true));
                 }
                 else if (c == '\'')
                 {
@@ -78,26 +88,21 @@ namespace CorpseLib.Scripts.Parser.Instruction
                         if (ch == '\'' && sb[^2] != '\\')
                             break;
                     }
-                    m_Tokens.Add(new(sb.ToString()));
-                }
-                else if (i + 1 < input.Length)
-                {
-                    string twoChar = input.Substring(i, 2);
-                    if (multiCharOps.Contains(twoChar))
-                    {
-                        m_Tokens.Add(new(twoChar));
-                        i += 2;
-                    }
-                    else
-                    {
-                        m_Tokens.Add(new(c.ToString()));
-                        i++;
-                    }
+                    m_Tokens.Add(new(sb.ToString(), null, false, true));
                 }
                 else
                 {
-                    m_Tokens.Add(new(c.ToString()));
-                    i++;
+                    Operator? @operator = operatorsHelper.GetMatchingOperator(input, i, out int length);
+                    if (@operator != null)
+                    {
+                        m_Tokens.Add(new(input.Substring(i, length), @operator, false, false));
+                        i += length;
+                    }
+                    else
+                    {
+                        m_Tokens.Add(new(c.ToString(), null, false, false));
+                        i++;
+                    }
                 }
             }
         }

@@ -1,6 +1,6 @@
 ﻿namespace CorpseLib.Scripts.Parser.Instruction.Expressions
 {
-    public class ArrayExpression(AExpression target, AExpression index) : AExpression
+    public class ArrayExpression(AExpression target, AExpression index) : AExpression(target.HasSideEffects || index.HasSideEffects)
     {
         public AExpression TargetArray = target;
         public AExpression Index = index;

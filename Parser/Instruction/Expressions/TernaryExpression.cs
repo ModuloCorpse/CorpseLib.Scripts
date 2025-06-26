@@ -1,6 +1,7 @@
 ﻿namespace CorpseLib.Scripts.Parser.Instruction.Expressions
 {
-    public class TernaryExpression(AExpression condition, AExpression @true, AExpression @false) : AExpression
+    //TODO : Optimize if condition is always true or false by returning directly true or false expression
+    public class TernaryExpression(AExpression condition, AExpression @true, AExpression @false) : AExpression(condition.HasSideEffects || @true.HasSideEffects || @false.HasSideEffects)
     {
         public AExpression Condition = condition;
         public AExpression True = @true;

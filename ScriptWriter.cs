@@ -211,7 +211,7 @@ namespace CorpseLib.Scripts
                 }
                 sb.Append('>');
             }
-            if (typeInfo.IsArray)
+            for (int i = 0; i != typeInfo.ArrayCount; ++i)
                 sb.Append("[]");
         }
 

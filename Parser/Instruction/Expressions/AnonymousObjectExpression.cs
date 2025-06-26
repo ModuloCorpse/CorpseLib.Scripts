@@ -1,6 +1,6 @@
 ﻿namespace CorpseLib.Scripts.Parser.Instruction.Expressions
 {
-    public class AnonymousObjectExpression(List<AExpression> parameters, bool isArray) : AExpression
+    public class AnonymousObjectExpression(List<AExpression> parameters, bool isArray) : AExpression(true)
     {
         public List<AExpression> Parameters = parameters;
         public bool IsArray = isArray;

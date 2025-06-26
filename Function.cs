@@ -9,28 +9,19 @@ namespace CorpseLib.Scripts
 
         public AInstruction[] Instructions => [..m_Instructions];
 
-        internal override object? InternalExecute(Environment env)
+        internal override object? InternalExecute(Environment env, FunctionStack stack)
         {
-            FunctionStack stack = new();
-            env.OpenScope();
             foreach (AInstruction instruction in m_Instructions)
             {
                 if (instruction is Break || instruction is Continue)
-                {
-                    env.CloseScope();
                     return new();
-                }
                 else
                 {
                     instruction.ExecuteInstruction(env, stack);
                     if (stack.HasReturn)
-                    {
-                        env.CloseScope();
                         return new();
-                    }
                 }
             }
-            env.CloseScope();
             return stack.ReturnValue;
         }
 

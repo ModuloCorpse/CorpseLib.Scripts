@@ -53,7 +53,7 @@ namespace CorpseLib.Scripts.Context
                     else
                         newTemplates.Add(ConvertTemplatedType(subTemplate, templateTypeGiven));
                 }
-                return new(baseType.IsConst, baseType.NamespacesID, baseType.ID, [..newTemplates], baseType.IsArray);
+                return new(baseType.IsConst, baseType.NamespacesID, baseType.ID, [..newTemplates], baseType.ArrayCount);
             }
 
             public override Parameter? Instantiate(Dictionary<int, TypeInfo> templateTypeGiven, Environment env)

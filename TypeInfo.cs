@@ -3,18 +3,18 @@ using System.Text;
 
 namespace CorpseLib.Scripts
 {
-    public class TypeInfo(bool isConst, int[] namespaces, int id, TypeInfo[] templates, bool isArray) : IEquatable<TypeInfo?>
+    public class TypeInfo(bool isConst, int[] namespaces, int id, TypeInfo[] templates, int arrayCount) : IEquatable<TypeInfo?>
     {
         private readonly TypeInfo[] m_TemplateTypes = templates;
         private readonly Signature m_Signature = new(namespaces, id);
-        private readonly bool m_IsArray = isArray;
+        private readonly int m_ArrayCount = arrayCount;
         private readonly bool m_IsConst = isConst;
 
         public TypeInfo[] TemplateTypes => m_TemplateTypes;
         public Signature Signature => m_Signature;
         public int[] NamespacesID => m_Signature.Namespaces;
         public int ID => m_Signature.ID;
-        public bool IsArray => m_IsArray;
+        public int ArrayCount => m_ArrayCount;
         public bool IsConst => m_IsConst;
 
         public static OperationResult<string[]> SplitTemplate(string template)
@@ -71,10 +71,10 @@ namespace CorpseLib.Scripts
                 isConst = true;
                 str = str[6..];
             }
-            bool isArray = false;
-            if (str.EndsWith("[]"))
+            int arrayCount = 0;
+            while (str.EndsWith("[]"))
             {
-                isArray = true;
+                ++arrayCount;
                 str = str[..^2].Trim();
             }
             List<TypeInfo> templateTypes = [];
@@ -110,16 +110,16 @@ namespace CorpseLib.Scripts
                 str = str[(idx + 1)..];
                 idx = str.IndexOf('.');
             }
-            return new(new(isConst, [.. namespaceIDs], conversionTable.PushName(str), [.. templateTypes], isArray));
+            return new(new(isConst, [.. namespaceIDs], conversionTable.PushName(str), [.. templateTypes], arrayCount));
         }
 
         public override bool Equals(object? obj) => Equals(obj as TypeInfo);
         public bool Equals(TypeInfo? other) => other is not null &&
             EqualityComparer<TypeInfo[]>.Default.Equals(m_TemplateTypes, other.m_TemplateTypes) &&
             EqualityComparer<Signature>.Default.Equals(m_Signature, other.m_Signature) &&
-            m_IsArray == other.m_IsArray && m_IsConst == other.m_IsConst;
+            m_ArrayCount == other.m_ArrayCount && m_IsConst == other.m_IsConst;
 
-        public override int GetHashCode() => HashCode.Combine(m_TemplateTypes, m_Signature, m_IsArray, m_IsConst);
+        public override int GetHashCode() => HashCode.Combine(m_TemplateTypes, m_Signature, m_ArrayCount, m_IsConst);
         public static bool operator ==(TypeInfo? left, TypeInfo? right) => EqualityComparer<TypeInfo>.Default.Equals(left, right);
         public static bool operator !=(TypeInfo? left, TypeInfo? right) => !(left == right);
     }

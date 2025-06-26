@@ -1,6 +1,6 @@
 ﻿namespace CorpseLib.Scripts.Parser.Instruction.Expressions
 {
-    public class FunctionCallExpression(int[] functionID, List<AExpression> args) : AExpression
+    public class FunctionCallExpression(int[] functionID, List<AExpression> args) : AExpression(true)
     {
         public int[] FunctionID = functionID;
         public List<AExpression> Arguments = args;

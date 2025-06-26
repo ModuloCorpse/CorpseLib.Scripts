@@ -4,12 +4,7 @@ namespace CorpseLib.Scripts.Instructions
 {
     public abstract class AInstruction
     {
-        internal void ExecuteInstruction(Environment env, FunctionStack instructionStack)
-        {
-            env.OpenScope();
-            Execute(env, instructionStack);
-            env.CloseScope();
-        }
+        internal void ExecuteInstruction(Environment env, FunctionStack instructionStack) => Execute(env, instructionStack);
 
         protected abstract void Execute(Environment env, FunctionStack instructionStack);
     }

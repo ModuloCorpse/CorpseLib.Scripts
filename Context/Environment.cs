@@ -1,33 +1,21 @@
 ﻿using CorpseLib.Scripts.Type.Primitive;
 using CorpseLib.Scripts.Type;
 using CorpseLib.Scripts.Instructions;
-using System.Xml.Linq;
 
 namespace CorpseLib.Scripts.Context
 {
     public class Environment
     {
         private readonly EnvironmentObjectDictionary m_Objects = new();
-        private VariableScope m_VariableScope = new();
+        private readonly Dictionary<int, Variable> m_Variables = [];
 
         public EnvironmentObjectDictionary Objects => m_Objects;
-
-        public void OpenScope() => m_VariableScope = new(m_VariableScope);
-        public void CloseScope()
-        {
-            if (m_VariableScope.Parent != null)
-                m_VariableScope = m_VariableScope.Parent;
-        }
 
         public void AddInstruction(AInstruction instruction, int[] namespaces, int[] tags, int[] comments)
         {
             InstructionObject instructionObject = new(instruction, tags, comments);
             m_Objects.Add(instructionObject, namespaces, 0);
         }
-
-        public void AddVariable(int id, Variable value) => m_VariableScope.AddVariable(id, value);
-
-        public Variable? GetVariable(int[] ids) => m_VariableScope.GetVariable(ids);
 
         public void ClearInvalid() => m_Objects.ClearInvalid();
 
@@ -83,15 +71,21 @@ namespace CorpseLib.Scripts.Context
         {
             if (typeInfo.NamespacesID.Length == 0 && Types.TryGet(typeInfo.ID, out ATypeInstance? primitiveInstance))
             {
-                if (typeInfo.IsArray)
-                    return new ArrayType(primitiveInstance!);
-                return primitiveInstance!;
+                ATypeInstance arrayRet = primitiveInstance!;
+                for (int i = 0; i < typeInfo.ArrayCount; ++i)
+                    arrayRet = new ArrayType(arrayRet);
+                return arrayRet;
             }
             if (Get(typeInfo.Signature) is not TypeObject typeObject)
                 return null;
             ATypeInstance? ret = typeObject.Instantiate(typeInfo, this);
-            if (ret != null && typeInfo.IsArray)
-                return new ArrayType(ret!);
+            if (ret != null)
+            {
+                ATypeInstance arrayRet = ret!;
+                for (int i = 0; i < typeInfo.ArrayCount; ++i)
+                    arrayRet = new ArrayType(arrayRet);
+                return arrayRet;
+            }
             return ret;
         }
 
@@ -99,17 +93,23 @@ namespace CorpseLib.Scripts.Context
         {
             if (typeInfo.NamespacesID.Length == 0 && Types.TryGet(typeInfo.ID, out ATypeInstance? primitiveInstance))
             {
-                if (typeInfo.IsArray)
-                    return new ArrayType(primitiveInstance!);
-                return primitiveInstance!;
+                ATypeInstance arrayRet = primitiveInstance!;
+                for (int i = 0; i < typeInfo.ArrayCount; ++i)
+                    arrayRet = new ArrayType(arrayRet);
+                return arrayRet;
             }
             List<Signature> searchedSignatures = [];
             Signature? signature = Search<TypeObject>(namespaces, typeInfo.Signature, searchedSignatures);
             if (signature == null || Get(signature) is not TypeObject typeObject)
                 return null;
             ATypeInstance? ret = typeObject.Instantiate(typeInfo, this);
-            if (ret != null && typeInfo.IsArray)
-                return new ArrayType(ret!);
+            if (ret != null)
+            {
+                ATypeInstance arrayRet = ret!;
+                for (int i = 0; i < typeInfo.ArrayCount; ++i)
+                    arrayRet = new ArrayType(arrayRet);
+                return arrayRet;
+            }
             return ret;
         }
     }

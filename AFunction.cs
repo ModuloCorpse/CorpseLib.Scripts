@@ -2,17 +2,15 @@
 
 namespace CorpseLib.Scripts
 {
-    public abstract class AFunction
+    public abstract class AFunction(FunctionSignature signature)
     {
-        private readonly FunctionSignature m_Signature;
+        private readonly FunctionSignature m_Signature = signature;
 
         public FunctionSignature Signature => m_Signature;
 
-        protected AFunction(FunctionSignature signature) => m_Signature = signature;
-
-        internal object? Call(object?[] parameters)
+        internal object? Call(Environment env, object?[] parameters)
         {
-            Environment env = new();
+            FunctionStack stack = new();
             int i = 0;
             while (i != m_Signature.Parameters.Length)
             {
@@ -23,17 +21,16 @@ namespace CorpseLib.Scripts
                     argument = param.Instantiate();
                 else if (param.Type.IsOfType([paramValue]))
                     argument = param.Instantiate([paramValue]);
-                env.AddVariable(param.ID, argument!);
-                //Fill env with parameters
+                stack.AddVariable(param.ID, argument!);
                 ++i;
             }
             if (i > parameters.Length)
             {
                 return null;
             }
-            return InternalExecute(env);
+            return InternalExecute(env, stack);
         }
 
-        internal abstract object? InternalExecute(Environment env);
+        internal abstract object? InternalExecute(Environment env, FunctionStack stack);
     }
 }

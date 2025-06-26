@@ -21,6 +21,13 @@ namespace CorpseLib.Scripts.Parser
         public string Error => m_Error;
         public bool HasErrors => m_HasErrors;
 
+        public void ClearWarnings() => m_Warnings.Clear();
+        public void ClearErrors()
+        {
+            m_Error = string.Empty;
+            m_HasErrors = false;
+        }
+
         public void RegisterWarning(string warning, string description) => m_Warnings.Add($"WARNING : {warning} : {description}");
 
         public void RegisterError(string error, string description)

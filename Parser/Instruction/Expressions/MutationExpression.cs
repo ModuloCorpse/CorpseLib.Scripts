@@ -1,6 +1,6 @@
 ﻿namespace CorpseLib.Scripts.Parser.Instruction.Expressions
 {
-    public class MutationExpression(AExpression target, Operator op, bool isPrefix) : AExpression
+    public class MutationExpression(AExpression target, Operator op, bool isPrefix) : AExpression(target is not LiteralExpression)
     {
         public AExpression Target = target;
         public Operator Operator = op;

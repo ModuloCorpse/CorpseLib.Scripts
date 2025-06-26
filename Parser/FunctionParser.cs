@@ -1,4 +1,5 @@
 ﻿using CorpseLib.Scripts.Instructions;
+using CorpseLib.Scripts.Parser.Instruction;
 using CorpseLib.Scripts.Type;
 using System.Text;
 using static CorpseLib.Scripts.Parser.CommentAndTagParser;
@@ -165,16 +166,6 @@ namespace CorpseLib.Scripts.Parser
                 return null;
             }
             return new(returnType, parsingContext.PushName(functionName), [.. parameters]);
-        }
-
-        private static AInstruction? ParseInstruction(string instruction)
-        {
-            if (instruction == "break")
-                return new Break();
-            else if (instruction == "continue")
-                return new Continue();
-            //TODO
-            return new DebugInstruction(instruction);
         }
 
         private static Tuple<string, string> ParseKeyword(string errorMessage, string keyword, ref string str, bool shouldHaveCondition, ParsingContext parsingContext)
@@ -359,7 +350,7 @@ namespace CorpseLib.Scripts.Parser
                     return null;
                 }
                 body = instructionParams.Item2;
-                AInstruction? instruction = ParseInstruction(instructionParams.Item1);
+                AInstruction? instruction = InstructionParser.Parse(instructionParams.Item1, parsingContext);
                 if (parsingContext.HasErrors)
                     return null;
                 return instruction;

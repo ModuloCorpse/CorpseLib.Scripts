@@ -1,6 +1,6 @@
 ﻿namespace CorpseLib.Scripts.Parser.Instruction.Expressions
 {
-    public class BinaryExpression(Operator op, AExpression left, AExpression right) : AExpression
+    public class BinaryExpression(Operator op, AExpression left, AExpression right) : AExpression(left.HasSideEffects || right.HasSideEffects)
     {
         public Operator Operator = op;
         public AExpression Left = left;

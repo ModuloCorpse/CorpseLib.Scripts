@@ -88,7 +88,7 @@ namespace CorpseLib.Scripts.Parser
                     return;
                 }
                 TypeInfo typeInfo = objectTypeTypeInfo.Result!;
-                TypeInfo realTypeInfo = new(typeInfo.IsConst, parsingContext.Namespaces, typeInfo.ID, typeInfo.TemplateTypes, typeInfo.IsArray);
+                TypeInfo realTypeInfo = new(typeInfo.IsConst, parsingContext.Namespaces, typeInfo.ID, typeInfo.TemplateTypes, typeInfo.ArrayCount);
                 ObjectType structDefinition = new(realTypeInfo);
                 TypeDefinition typeDefinition = new(new Signature(parsingContext.Namespaces, realTypeInfo.ID), tupleResult.Result!.Item2);
                 parsingContext.PushTypeDefinition(typeDefinition, commentAndTags.Tags, commentAndTags.CommentIDs);

@@ -1,6 +1,6 @@
 ﻿namespace CorpseLib.Scripts.Parser.Instruction.Expressions
 {
-    public class AssignmentExpression(int[] variableID, AExpression value) : AExpression
+    public class AssignmentExpression(int[] variableID, AExpression value) : AExpression(true)
     {
         public int[] VariableID = variableID;
         public AExpression Value = value;

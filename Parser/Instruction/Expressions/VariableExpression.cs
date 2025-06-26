@@ -1,6 +1,6 @@
 ﻿namespace CorpseLib.Scripts.Parser.Instruction.Expressions
 {
-    public class VariableExpression(int[] ids) : AExpression
+    public class VariableExpression(int[] ids) : AExpression(false)
     {
         public int[] IDs = ids;
 

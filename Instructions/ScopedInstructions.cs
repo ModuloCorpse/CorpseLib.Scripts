@@ -26,17 +26,17 @@ namespace CorpseLib.Scripts.Instructions
 
         public EExecutionResult Execute(Environment env, FunctionStack functionStack)
         {
-            env.OpenScope();
+            functionStack.OpenScope();
             foreach (AInstruction instruction in m_Instructions)
             {
                 if (instruction is Break)
                 {
-                    env.CloseScope();
+                    functionStack.CloseScope();
                     return EExecutionResult.Breaked;
                 }
                 else if (instruction is Continue)
                 {
-                    env.CloseScope();
+                    functionStack.CloseScope();
                     return EExecutionResult.Continued;
                 }
                 else
@@ -44,12 +44,12 @@ namespace CorpseLib.Scripts.Instructions
                     instruction.ExecuteInstruction(env, functionStack);
                     if (functionStack.HasReturn)
                     {
-                        env.CloseScope();
+                        functionStack.CloseScope();
                         return EExecutionResult.Returned;
                     }
                 }
             }
-            env.CloseScope();
+            functionStack.CloseScope();
             return EExecutionResult.None;
         }
     }

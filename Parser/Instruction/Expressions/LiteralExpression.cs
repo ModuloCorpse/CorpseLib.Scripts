@@ -1,6 +1,6 @@
 ﻿namespace CorpseLib.Scripts.Parser.Instruction.Expressions
 {
-    public class LiteralExpression(object[] value) : AExpression
+    public class LiteralExpression(object[] value) : AExpression(false)
     {
         public object[] Value = value;
 

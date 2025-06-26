@@ -1,7 +1,7 @@
 ﻿namespace CorpseLib.Scripts.Parser.Instruction.Expressions
 {
     // TODO : Optimize away if value is variable or literal and if the variable is not used in the script
-    public class CreateVariableExpression(TypeInfo typeName, int[] variableID, AExpression? value) : AExpression
+    public class CreateVariableExpression(TypeInfo typeName, int[] variableID, AExpression? value) : AExpression(true)
     {
         public TypeInfo TypeName = typeName;
         public int[] VariableID = variableID;

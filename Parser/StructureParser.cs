@@ -70,7 +70,7 @@ namespace CorpseLib.Scripts.Parser
             return new(new(template, []));
         }
 
-        private static void LoadStructure(string objectTypeName, string structContent, OldEnvironment env, ParsingContext parsingContext, CommentAndTags commentAndTags)
+        private static void LoadStructure(string objectTypeName, string structContent, ParsingContext parsingContext, CommentAndTags commentAndTags)
         {
             if (!string.IsNullOrEmpty(objectTypeName))
             {
@@ -92,7 +92,6 @@ namespace CorpseLib.Scripts.Parser
                 ObjectType structDefinition = new(realTypeInfo);
                 TypeDefinition typeDefinition = new(new Signature(parsingContext.Namespaces, realTypeInfo.ID), tupleResult.Result!.Item2);
                 parsingContext.PushTypeDefinition(typeDefinition, commentAndTags.Tags, commentAndTags.CommentIDs);
-                env.AddTypeDefinition(typeDefinition);
                 while (!string.IsNullOrEmpty(structContent))
                 {
                     Tuple<string, string> structAttribute = ParserHelper.NextInstruction(structContent, out bool foundAttribute);
@@ -122,7 +121,7 @@ namespace CorpseLib.Scripts.Parser
                     TypeInfo attributeTypeInfo = attributeTypeInfoResult.Result!;
                     int nameID = parsingContext.PushName(parameterParts[1]);
                     object[]? value = (parameterParts.Length == 3) ? ValueParser.ParseValue(parameterParts[2], parsingContext) : null;
-                    ATypeInstance? parameterType = env.Instantiate(attributeTypeInfo);
+                    ATypeInstance? parameterType = parsingContext.Instantiate(attributeTypeInfo);
                     if (parameterType != null)
                     {
                         if (parameterType is VoidType)
@@ -142,10 +141,7 @@ namespace CorpseLib.Scripts.Parser
                 }
 
                 if (typeDefinition.Templates.Length == 0)
-                {
-                    env.AddType(structDefinition);
                     parsingContext.PushType(structDefinition);
-                }
             }
             else
             {
@@ -154,7 +150,7 @@ namespace CorpseLib.Scripts.Parser
             }
         }
 
-        internal static void LoadStructureContent(CommentAndTags commentAndTags, OldEnvironment @namespace, ref string str, ParsingContext parsingContext)
+        internal static void LoadStructureContent(CommentAndTags commentAndTags, ref string str, ParsingContext parsingContext)
         {
             Tuple<string, string, string> scoped = ParserHelper.IsolateScope(str, '{', '}', out bool found);
             if (!found)
@@ -162,7 +158,7 @@ namespace CorpseLib.Scripts.Parser
                 parsingContext.RegisterError("Invalid script", "Bad structure definition");
                 return;
             }
-            LoadStructure(scoped.Item1[7..], scoped.Item2, @namespace, parsingContext, commentAndTags);
+            LoadStructure(scoped.Item1[7..], scoped.Item2, parsingContext, commentAndTags);
             if (parsingContext.HasErrors)
                 return;
             str = scoped.Item3;

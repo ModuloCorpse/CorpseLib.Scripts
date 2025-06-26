@@ -10,7 +10,7 @@ namespace CorpseLib.Scripts.Context
     {
         private readonly AFunction m_Function = function;
 
-        internal AFunction Function => m_Function;
+        public AFunction Function => m_Function;
 
         public override bool IsValid() => true;
     }

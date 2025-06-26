@@ -55,7 +55,7 @@ namespace CorpseLib.Scripts.Parser
             return [.. ret];
         }
 
-        internal static Parameter? ParseParameter(string parameter, OldEnvironment env, ParsingContext parsingContext)
+        internal static Parameter? ParseParameter(string parameter, ParsingContext parsingContext)
         {
             if (string.IsNullOrEmpty(parameter))
             {
@@ -72,7 +72,7 @@ namespace CorpseLib.Scripts.Parser
                 parsingContext.RegisterError(typeInfo.Error, typeInfo.Description);
                 return null;
             }
-            ATypeInstance? parameterType = env.Instantiate(typeInfo.Result!);
+            ATypeInstance? parameterType = parsingContext.Instantiate(typeInfo.Result!);
             if (parameterType == null)
             {
                 parsingContext.RegisterError("Unknown parameter type", parameterParts[0]);

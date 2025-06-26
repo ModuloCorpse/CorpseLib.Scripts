@@ -5,22 +5,7 @@ namespace CorpseLib.Scripts.Parser
 {
     internal static class NamespaceParser
     {
-        private static void LoadNamespace(string namespaceName, string namespaceContent, OldEnvironment env, ParsingContext parsingContext)
-        {
-            Namespace? parent = (env is Namespace namespc) ? namespc : null;
-            Namespace @namespace = new(parsingContext.PushName(namespaceName), parent);
-            LoadNamespaceContent(@namespace, namespaceContent, parsingContext);
-            if (parsingContext.HasErrors)
-                return;
-            if (!env.AddNamespace(@namespace))
-            {
-                parsingContext.RegisterError("Invalid script", $"Namespace {ScriptWriter.GenerateNamespaceName(parsingContext.Namespaces, parsingContext.ConversionTable)} already exist");
-                return;
-            }
-            return;
-        }
-
-        internal static void LoadNamespaceContent(OldEnvironment @namespace, string str, ParsingContext parsingContext)
+        internal static void LoadNamespaceContent(string str, ParsingContext parsingContext)
         {
             while (!string.IsNullOrEmpty(str))
             {
@@ -31,9 +16,9 @@ namespace CorpseLib.Scripts.Parser
                 if (!string.IsNullOrEmpty(str))
                 {
                     if (str.StartsWith("fct "))
-                        FunctionParser.LoadFunctionContent(commentAndTags!, @namespace, ref str, parsingContext);
+                        FunctionParser.LoadFunctionContent(commentAndTags!, ref str, parsingContext);
                     else if (str.StartsWith("struct "))
-                        StructureParser.LoadStructureContent(commentAndTags!, @namespace, ref str, parsingContext);
+                        StructureParser.LoadStructureContent(commentAndTags!, ref str, parsingContext);
                     else if (str.StartsWith("namespace "))
                     {
                         Tuple<string, string, string> scoped = ParserHelper.IsolateScope(str, '{', '}', out bool found);
@@ -43,8 +28,12 @@ namespace CorpseLib.Scripts.Parser
                             return;
                         }
                         string namespaceName = scoped.Item1[10..];
-                        int namespaceID = parsingContext.PushNamespace(namespaceName, commentAndTags!.Tags, commentAndTags!.CommentIDs);
-                        LoadNamespace(namespaceName, scoped.Item2, @namespace, parsingContext);
+                        if (!parsingContext.PushNamespace(namespaceName, commentAndTags!.Tags, commentAndTags!.CommentIDs))
+                        {
+                            parsingContext.RegisterError("Invalid script", $"Namespace {ScriptWriter.GenerateNamespaceName(parsingContext.Namespaces, parsingContext.ConversionTable)} already exist");
+                            return;
+                        }
+                        LoadNamespaceContent(scoped.Item2, parsingContext);
                         parsingContext.PopNamespace();
                         if (parsingContext.HasErrors)
                             return;
@@ -57,8 +46,7 @@ namespace CorpseLib.Scripts.Parser
                             return;
                         //TODO : Handle specifically global variables instructions
                         //TODO : Handle namespaces
-                        @namespace.AddInstruction(instruction);
-                        parsingContext.PushInstruction(instruction, parsingContext.Namespaces, commentAndTags!.Tags, commentAndTags.CommentIDs);
+                        parsingContext.PushInstruction(instruction, commentAndTags!.Tags, commentAndTags.CommentIDs);
                     }
                 }
                 else

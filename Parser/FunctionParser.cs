@@ -114,7 +114,7 @@ namespace CorpseLib.Scripts.Parser
             return [.. result];
         }
 
-        private static FunctionSignature? ParseFunctionSignature(string parametersStr, string signatureStr, OldEnvironment env, ParsingContext parsingContext, out string functionName)
+        private static FunctionSignature? ParseFunctionSignature(string parametersStr, string signatureStr, ParsingContext parsingContext, out string functionName)
         {
             string[] signatureParts = signatureStr.Split(' ');
             string returnTypeStr;
@@ -145,7 +145,7 @@ namespace CorpseLib.Scripts.Parser
                 string[] parametersStrArr = FunctionSignatureParameterSplit(parametersStr);
                 for (int i = 0; i != parametersStrArr.Length; ++i)
                 {
-                    Parameter? result = ParameterParser.ParseParameter(parametersStrArr[i], env, parsingContext);
+                    Parameter? result = ParameterParser.ParseParameter(parametersStrArr[i], parsingContext);
                     if (parsingContext.HasErrors)
                         return null;
                     parameters.Add(result!);
@@ -158,7 +158,7 @@ namespace CorpseLib.Scripts.Parser
                 parsingContext.RegisterError(returnTypeInfo.Error, returnTypeInfo.Description);
                 return null;
             }
-            ATypeInstance? returnType = env.Instantiate(returnTypeInfo.Result!);
+            ATypeInstance? returnType = parsingContext.Instantiate(returnTypeInfo.Result!);
             if (returnType == null)
             {
                 parsingContext.RegisterError("Misformated function signature string", $"Unknown return type : {returnTypeStr}");
@@ -362,7 +362,7 @@ namespace CorpseLib.Scripts.Parser
                 AInstruction? instruction = ParseInstruction(instructionParams.Item1);
                 if (parsingContext.HasErrors)
                     return null;
-                return instruction!;
+                return instruction;
             }
         }
 
@@ -374,12 +374,13 @@ namespace CorpseLib.Scripts.Parser
                 AInstruction? instruction = LoadInstruction(errorMessage, ref body, parsingContext);
                 if (parsingContext.HasErrors)
                     return [];
-                instructions.Add(instruction!);
+                if (instruction != null)
+                    instructions.Add(instruction);
             }
             return instructions;
         }
 
-        internal static void LoadFunctionContent(CommentAndTags _, OldEnvironment @namespace, ref string str, ParsingContext parsingContext)
+        internal static void LoadFunctionContent(CommentAndTags commentAndTags, ref string str, ParsingContext parsingContext)
         {
             //TODO : Handle comments and tags
             Tuple<string, string, string> signatureSplit = ParserHelper.IsolateScope(str, '(', ')', out bool parametersFound);
@@ -390,7 +391,7 @@ namespace CorpseLib.Scripts.Parser
             }
             str = signatureSplit.Item3;
             //TODO
-            FunctionSignature? functionSignatureResult = ParseFunctionSignature(signatureSplit.Item2, signatureSplit.Item1[4..], @namespace, parsingContext, out string functionSignatureName);
+            FunctionSignature? functionSignatureResult = ParseFunctionSignature(signatureSplit.Item2, signatureSplit.Item1[4..], parsingContext, out string functionSignatureName);
             if (parsingContext.HasErrors)
                 return;
             FunctionSignature functionSignature = functionSignatureResult!;
@@ -407,7 +408,7 @@ namespace CorpseLib.Scripts.Parser
             if (parsingContext.HasErrors)
                 return;
             function.AddInstructions(functionBody);
-            if (!@namespace.AddFunction(function))
+            if (!parsingContext.PushFunction(function, commentAndTags.Tags, commentAndTags.CommentIDs))
             {
                 parsingContext.RegisterError("Invalid script", $"Function {functionSignatureName} already exist");
                 return;

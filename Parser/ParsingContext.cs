@@ -5,9 +5,10 @@ using Environment = CorpseLib.Scripts.Context.Environment;
 
 namespace CorpseLib.Scripts.Parser
 {
-    public class ParsingContext
+    public class ParsingContext(Environment environment)
     {
-        private readonly Environment m_Environment = new();
+        private readonly Environment m_Environment = environment;
+        private readonly Environment m_LoadedEnvironment = new();
         private readonly ConversionTable m_ConversionTable = new();
         private readonly List<int> m_Namespaces = [];
         private readonly List<string> m_Warnings = [];
@@ -28,29 +29,51 @@ namespace CorpseLib.Scripts.Parser
             m_HasErrors = true;
         }
 
-        public void PushInstruction(AInstruction instruction, int[] namespaces, int[] tags, int[] comments) => m_Environment.AddInstruction(instruction, namespaces, tags, comments);
+        public bool PushFunction(AFunction function, int[] tags, int[] comments) =>
+            m_Environment.AddFunction([.. m_Namespaces], function, tags, comments) &&
+            m_LoadedEnvironment.AddFunction([.. m_Namespaces], function, tags, comments);
 
-        public void PushTypeDefinition(TypeDefinition typeDefinition, int[] tags, int[] comments) => m_Environment.AddTypeDefinition(typeDefinition, tags, comments);
+        public void PushInstruction(AInstruction instruction, int[] tags, int[] comments)
+        {
+            m_Environment.AddInstruction(instruction, [.. m_Namespaces], tags, comments);
+            m_LoadedEnvironment.AddInstruction(instruction, [.. m_Namespaces], tags, comments);
+        }
 
-        public void PushType(ATypeInstance type) => m_Environment.AddType(type);
+        public void PushTypeDefinition(TypeDefinition typeDefinition, int[] tags, int[] comments)
+        {
+            m_Environment.AddTypeDefinition(typeDefinition, tags, comments);
+            m_LoadedEnvironment.AddTypeDefinition(typeDefinition, tags, comments);
+        }
 
-        public int PushNamespace(string @namespace, int[] tags, int[] comments)
+        public void PushType(ATypeInstance type)
+        {
+            m_Environment.AddType(type);
+            m_LoadedEnvironment.AddType(type);
+        }
+
+        public bool PushNamespace(string @namespace, int[] tags, int[] comments)
         {
             int namespaceID = m_ConversionTable.PushName(@namespace);
-            m_Environment.AddNamespace([..m_Namespaces], namespaceID, tags, comments);
-            m_Namespaces.Add(namespaceID);
-            return namespaceID;
+            if (m_Environment.AddNamespace([.. m_Namespaces], namespaceID, tags, comments) &&
+                m_LoadedEnvironment.AddNamespace([.. m_Namespaces], namespaceID, tags, comments))
+            {
+                m_Namespaces.Add(namespaceID);
+                return true;
+            }
+            return false;
         }
 
         public void PopNamespace() => m_Namespaces.RemoveAt(m_Namespaces.Count - 1);
 
         public int PushName(string name) => m_ConversionTable.PushName(name);
 
-        public ParserResult CreateParserResult(Script script, List<AComment> comments)
+        public ParserResult CreateParserResult(List<AComment> comments)
         {
             if (m_HasErrors)
                 return new ParserResult(m_Error);
-            return new ParserResult(script, m_Environment, m_ConversionTable, comments);
+            return new ParserResult(m_LoadedEnvironment, m_ConversionTable, comments);
         }
+
+        public ATypeInstance? Instantiate(TypeInfo typeInfo) => m_LoadedEnvironment.Instantiate(typeInfo, [..m_Namespaces]);
     }
 }

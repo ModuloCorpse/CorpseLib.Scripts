@@ -204,6 +204,12 @@ namespace CorpseLib.Scripts.Parser
                     return [false];
                 else if (str.Contains('.'))
                 {
+                    if (str.Length > 2 && str[0] == '-' && str[1] == '.')
+                        str = $"-0,{str[2..]}";
+                    else if (str.Length > 1 && str[0] == '.')
+                        str = $"0,{str[1..]}";
+                    else
+                        str = str.Replace('.', ',');
                     if (double.TryParse(str, out double value))
                     {
                         if (value >= float.MinValue && value <= float.MaxValue)

@@ -1,8 +1,8 @@
 ﻿namespace CorpseLib.Scripts.Parser.Instruction.Expressions
 {
-    public class BinaryExpression(string op, AExpression left, AExpression right) : AExpression
+    public class BinaryExpression(Operator op, AExpression left, AExpression right) : AExpression
     {
-        public string Operator = op;
+        public Operator Operator = op;
         public AExpression Left = left;
         public AExpression Right = right;
 
@@ -10,7 +10,7 @@
         {
             Console.Write(str);
             Console.Write("- Binary: ");
-            Console.WriteLine(Operator);
+            Console.WriteLine(Operator.OperatorString);
             Left.Dump(conversionTable, str + "   ");
             Right.Dump(conversionTable, str + "   ");
         }

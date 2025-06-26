@@ -7,6 +7,7 @@
         private readonly bool m_IsIdentifier = isIdentifier;
         private readonly bool m_IsLiteral = isLiteral;
 
+        public Operator Operator => m_Operator!;
         public string Token => m_Token;
         public int Weight => m_Operator?.Weight ?? -1;
         public bool IsUnaryMutation => m_Operator?.IsMutation ?? false;

@@ -13,102 +13,6 @@ namespace CorpseLib.Scripts.Parser.Instruction
             return [..ids];
         }
 
-        public static OperationResult<AExpression> Parse(string input, ParsingContext parsingContext)
-        {
-            if (string.IsNullOrEmpty(input))
-                return new("Error while parsing instruction", "Input is empty");
-            TokenReader tokens = new(input);
-            ExpressionToken currentToken = tokens.Current!;
-            if (currentToken.IsUnaryMutation && (tokens[1]?.IsIdentifier ?? false))
-            {
-                string op = currentToken.Token;
-                tokens.Pop();
-                int[] nameIDs = ConvertNameFromToken(tokens.Current!, parsingContext);
-                return new(new UnaryMutationExpression(new VariableExpression(nameIDs), op, true));
-            }
-            else if (currentToken.IsIdentifier && (tokens[1]?.IsIdentifier ?? false) && tokens[2]?.Token == "=")
-            {
-                string typeStr = currentToken.Token;
-                OperationResult<TypeInfo> typeInfoResult = TypeInfo.ParseStr(typeStr, parsingContext.ConversionTable);
-                if (!typeInfoResult)
-                    return typeInfoResult.Cast<AExpression>();
-                TypeInfo type = typeInfoResult.Result!;
-                tokens.Pop();
-                int[] nameIDs = ConvertNameFromToken(tokens.Current!, parsingContext);
-                tokens.Pop();
-                tokens.Pop();
-                OperationResult<AExpression> exprResult = ParseExpression(tokens, parsingContext);
-                if (!exprResult)
-                    return exprResult;
-                AExpression expr = exprResult.Result!;
-                return new(new AssignmentExpression(type, nameIDs, expr));
-            }
-            else if (currentToken.IsIdentifier && (tokens[1]?.IsCompoundOperator ?? false))
-            {
-                int[] nameIDs = ConvertNameFromToken(tokens.Current!, parsingContext);
-                tokens.Pop();
-                string op = tokens.Current!.Token[..^1];
-                tokens.Pop();
-                OperationResult<AExpression> exprResult = ParseExpression(tokens, parsingContext);
-                if (!exprResult)
-                    return exprResult;
-                BinaryExpression binaryExpression = new(op, new VariableExpression(nameIDs), exprResult.Result!);
-                return new(new AssignmentExpression(null, nameIDs, binaryExpression));
-            }
-            else if (currentToken.IsIdentifier && tokens[1]?.Token == "=")
-            {
-                int[] nameIDs = ConvertNameFromToken(tokens.Current!, parsingContext);
-                tokens.Pop();
-                tokens.Pop();
-                OperationResult<AExpression> exprResult = ParseExpression(tokens, parsingContext);
-                if (!exprResult)
-                    return exprResult;
-                AExpression expr = exprResult.Result!;
-                return new(new AssignmentExpression(null, nameIDs, expr));
-            }
-            else if (currentToken.IsIdentifier && (tokens[1]?.IsUnaryMutation ?? false))
-            {
-                int[] nameIDs = ConvertNameFromToken(tokens.Current!, parsingContext);
-                tokens.Pop();
-                string op = tokens.Current!.Token;
-                tokens.Pop();
-                return new(new UnaryMutationExpression(new VariableExpression(nameIDs), op, false));
-            }
-            return ParseExpression(tokens, parsingContext);
-        }
-
-        private static OperationResult<AExpression> ParseExpression(TokenReader tokens, ParsingContext parsingContext, int weight = 0)
-        {
-            OperationResult<AExpression> leftResult = ParsePrimary(tokens, parsingContext, false);
-            if (!leftResult)
-                return leftResult;
-            AExpression left = leftResult.Result!;
-            while (tokens.HasNext)
-            {
-                ExpressionToken nextToken = tokens.Current!;
-                string op = nextToken.Token;
-                int tokenWeight = nextToken.Weight;
-                if (tokenWeight < weight || tokenWeight < 0)
-                    break;
-                tokens.Pop();
-                int nextWeight = tokenWeight + (op == "=" ? 0 : 1);
-                OperationResult<AExpression> rightResult = ParseExpression(tokens, parsingContext, nextWeight);
-                if (!rightResult)
-                    return rightResult;
-                AExpression right = rightResult.Result!;
-                if (op == "=")
-                {
-                    if (left is VariableExpression varExpr)
-                        left = new AssignmentExpression(null, varExpr.IDs, right);
-                    else
-                        return new("Error while parsing instruction", "Left side of '=' must be a variable.");
-                }
-                else
-                    left = new BinaryExpression(op, left, right);
-            }
-            return new(left);
-        }
-
         private static bool IsExpressionLiteral(AExpression expr)
         {
             if (expr is LiteralExpression)
@@ -125,6 +29,178 @@ namespace CorpseLib.Scripts.Parser.Instruction
             return false;
         }
 
+        private static bool IsExpressionLiteralOrVariable(AExpression expr) => expr is VariableExpression || IsExpressionLiteral(expr);
+
+        private static bool ShouldBeOptimizedAway(AExpression expression)
+        {
+            // If the expression is only a literal or an anonymous object with only literals, it can be optimized away.
+            if (IsExpressionLiteral(expression))
+                return true;
+
+            // If the expression is a mutation expression and its target is a literal, it can also be optimized away.
+            if (expression is MutationExpression mutationExpression && IsExpressionLiteral(mutationExpression.Target))
+                return true;
+
+            // If the expression is a binary expression and its targets are literals, it can also be optimized away.
+            if (expression is BinaryExpression binaryExpression &&
+                IsExpressionLiteralOrVariable(binaryExpression.Left) &&
+                IsExpressionLiteralOrVariable(binaryExpression.Right))
+                return true;
+
+            // If the expression is a binary expression and its targets are literals, it can also be optimized away.
+            if (expression is ArrayExpression arrayExpression &&
+                IsExpressionLiteralOrVariable(arrayExpression.TargetArray) &&
+                IsExpressionLiteralOrVariable(arrayExpression.TargetArray))
+                return true;
+
+            return false;
+        }
+
+        public static OperationResult<AExpression> Parse(string input, ParsingContext parsingContext)
+        {
+            if (string.IsNullOrEmpty(input))
+                return new("Error while parsing instruction", "Input is empty");
+            TokenReader tokens = new(input);
+            ExpressionToken currentToken = tokens.Current!;
+            if (currentToken.IsIdentifier && (tokens[1]?.IsIdentifier ?? false) && (tokens[2]?.Token == "=" || tokens[2] == null))
+            {
+                string typeStr = currentToken.Token;
+                OperationResult<TypeInfo> typeInfoResult = TypeInfo.ParseStr(typeStr, parsingContext.ConversionTable);
+                if (!typeInfoResult)
+                    return typeInfoResult.Cast<AExpression>();
+                TypeInfo type = typeInfoResult.Result!;
+                tokens.Pop();
+                int[] nameIDs = ConvertNameFromToken(tokens.Current!, parsingContext);
+                tokens.Pop();
+                if (tokens.Current?.Token == "=")
+                {
+                    tokens.Pop();
+                    OperationResult<AExpression> exprResult = ParseExpression(tokens, parsingContext);
+                    if (!exprResult)
+                        return exprResult;
+                    AExpression expr = exprResult.Result!;
+                    return new(new CreateVariableExpression(type, nameIDs, expr));
+                }
+                return new(new CreateVariableExpression(type, nameIDs, null));
+            }
+            else if (currentToken.IsUnaryMutation && (tokens[1]?.IsIdentifier ?? false) && tokens[2] == null)
+            {
+                Operator op = currentToken.Operator;
+                tokens.Pop();
+                int[] nameIDs = ConvertNameFromToken(tokens.Current!, parsingContext);
+                return new(new MutationExpression(new VariableExpression(nameIDs), op, true));
+            }
+            else if (currentToken.IsIdentifier && (tokens[1]?.IsUnaryMutation ?? false) && tokens[2] == null)
+            {
+                int[] nameIDs = ConvertNameFromToken(currentToken, parsingContext);
+                tokens.Pop();
+                Operator op = tokens.Current!.Operator;
+                return new(new MutationExpression(new VariableExpression(nameIDs), op, true));
+            }
+            else if (currentToken.IsIdentifier && (tokens[1]?.IsCompoundOperator ?? false))
+            {
+                int[] nameIDs = ConvertNameFromToken(tokens.Current!, parsingContext);
+                tokens.Pop();
+                Operator op = tokens.Current!.Operator;
+                tokens.Pop();
+                OperationResult<AExpression> exprResult = ParseExpression(tokens, parsingContext);
+                if (!exprResult)
+                    return exprResult;
+                BinaryExpression binaryExpression = new(op, new VariableExpression(nameIDs), exprResult.Result!);
+                return new(new AssignmentExpression(nameIDs, binaryExpression));
+            }
+            else if (currentToken.IsIdentifier && tokens[1]?.Token == "=")
+            {
+                int[] nameIDs = ConvertNameFromToken(tokens.Current!, parsingContext);
+                tokens.Pop();
+                tokens.Pop();
+                OperationResult<AExpression> exprResult = ParseExpression(tokens, parsingContext);
+                if (!exprResult)
+                    return exprResult;
+                AExpression expr = exprResult.Result!;
+                return new(new AssignmentExpression(nameIDs, expr));
+            }
+            OperationResult<AExpression> result = ParseExpression(tokens, parsingContext);
+            if (!result)
+                return result;
+            AExpression expression = result.Result!;
+            if (ShouldBeOptimizedAway(expression))
+                return new(new OptimizedAwayExpression());
+            return result;
+        }
+
+        private static OperationResult<AExpression> ParseExpression(TokenReader tokens, ParsingContext parsingContext, int weight = 0)
+        {
+            OperationResult<AExpression> leftResult = ParseTernaryExpression(tokens, parsingContext, false);
+            if (!leftResult)
+                return leftResult;
+            AExpression left = leftResult.Result!;
+            while (tokens.HasNext)
+            {
+                ExpressionToken nextToken = tokens.Current!;
+                bool isAssignment = nextToken.Token == "=";
+                int tokenWeight = nextToken.Weight;
+                if (tokenWeight < weight || tokenWeight < 0)
+                    break;
+                tokens.Pop();
+                int nextWeight = tokenWeight + (isAssignment ? 0 : 1);
+                OperationResult<AExpression> rightResult = ParseExpression(tokens, parsingContext, nextWeight);
+                if (!rightResult)
+                    return rightResult;
+                AExpression right = rightResult.Result!;
+                if (isAssignment)
+                {
+                    if (left is VariableExpression varExpr)
+                        left = new AssignmentExpression(varExpr.IDs, right);
+                    else
+                        return new("Error while parsing instruction", "Left side of '=' must be a variable.");
+                }
+                else
+                    left = new BinaryExpression(nextToken.Operator, left, right);
+            }
+            return new(left);
+        }
+
+        private static OperationResult<AExpression> ParseTernaryExpression(TokenReader tokens, ParsingContext parsingContext, bool isReversed)
+        {
+            OperationResult<AExpression> result = ParsePrimary(tokens, parsingContext, isReversed);
+            if (!result)
+                return result;
+            if (result.Result is AnonymousObjectExpression anonymousObject)
+            {
+
+            }
+
+            if (tokens.Current?.IsUnaryMutation ?? false)
+            {
+                Operator op = tokens.Current.Operator;
+                tokens.Pop();
+                return new(new MutationExpression(result.Result!, op, false));
+            }
+            else if (tokens.Current?.Token == "[")
+            {
+                tokens.Pop();
+                OperationResult<AExpression> indexResult = ParseExpression(tokens, parsingContext);
+                if (!indexResult)
+                    return indexResult;
+                if (tokens.Current?.Token != "]")
+                    return new("Error while parsing instruction", $"Expected ')' but found '{tokens.Current}'");
+                tokens.Pop();
+                return new(new ArrayExpression(result.Result!, indexResult.Result!));
+            }
+            else if (tokens.Current?.Token == "?")
+            {
+                tokens.Pop();
+                OperationResult<AExpression> ternaryResult = ParseExpression(tokens, parsingContext);
+                if (!ternaryResult)
+                    return ternaryResult;
+                if (ternaryResult.Result is BinaryExpression binary)
+                    return new(new TernaryExpression(result.Result!, binary.Left, binary.Right));
+                return new("Error while parsing instruction", "Invalid ternary");
+            }
+            return result;
+        }
+
         private static OperationResult<AExpression> ParsePrimary(TokenReader tokens, ParsingContext parsingContext, bool isReversed)
         {
             ExpressionToken? currentToken = tokens.Current;
@@ -132,19 +208,19 @@ namespace CorpseLib.Scripts.Parser.Instruction
                 return new("Error while parsing instruction", "tokens are empty");
             if (currentToken.IsUnaryMutation)
             {
-                string op = currentToken.Token;
+                Operator op = currentToken.Operator;
                 tokens.Pop();
-                OperationResult<AExpression> target = ParsePrimary(tokens, parsingContext, false);
+                OperationResult<AExpression> target = ParseTernaryExpression(tokens, parsingContext, false);
                 if (!target)
                     return target;
-                return new(new UnaryMutationExpression(target.Result!, op, true));
+                return new(new MutationExpression(target.Result!, op, true));
             }
             else if (currentToken.IsUnaryOperator)
             {
-                string op = currentToken.Token;
                 tokens.Pop();
-                bool isNegative = (op == "-");
-                OperationResult<AExpression> operandResult = ParsePrimary(tokens, parsingContext, isNegative);
+                Operator op = currentToken.Operator;
+                bool isNegative = (currentToken.Token == "-");
+                OperationResult<AExpression> operandResult = ParseTernaryExpression(tokens, parsingContext, isNegative);
                 if (!operandResult)
                     return operandResult;
                 AExpression operand = operandResult.Result!;
@@ -253,7 +329,7 @@ namespace CorpseLib.Scripts.Parser.Instruction
                         return new("Error while parsing instruction", $"Expected '>' but found '{tokens.Current}'");
                     tokens.Pop();
                 }
-
+                
                 if (tokens.Current?.Token == "(")
                 {
                     tokens.Pop();
@@ -279,16 +355,10 @@ namespace CorpseLib.Scripts.Parser.Instruction
                     if (tokens.Current?.Token != ")")
                         return new("Error while parsing instruction", $"Expected ')' but found '{tokens.Current}'");
                     tokens.Pop();
+                    //TODO Handle templates in functions
                     return new(new FunctionCallExpression(nameIDs, args));
                 }
-                AExpression expr = new VariableExpression(nameIDs);
-                if (tokens.Current?.IsUnaryMutation ?? false)
-                {
-                    string op = tokens.Current.Token;
-                    tokens.Pop();
-                    return new(new UnaryMutationExpression(expr, op, false));
-                }
-                return new(expr);
+                return new(new VariableExpression(nameIDs));
             }
             return new("Error while parsing instruction", $"Unexpected token: {tokens.Current}");
         }

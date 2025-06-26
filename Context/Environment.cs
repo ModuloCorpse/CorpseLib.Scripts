@@ -1,6 +1,7 @@
 ﻿using CorpseLib.Scripts.Type.Primitive;
 using CorpseLib.Scripts.Type;
 using CorpseLib.Scripts.Instructions;
+using System.Xml.Linq;
 
 namespace CorpseLib.Scripts.Context
 {
@@ -9,7 +10,7 @@ namespace CorpseLib.Scripts.Context
         private readonly EnvironmentObjectDictionary m_Objects = new();
         private VariableScope m_VariableScope = new();
 
-        internal EnvironmentObjectDictionary Objects => m_Objects;
+        public EnvironmentObjectDictionary Objects => m_Objects;
 
         public void OpenScope() => m_VariableScope = new(m_VariableScope);
         public void CloseScope()
@@ -87,6 +88,24 @@ namespace CorpseLib.Scripts.Context
                 return primitiveInstance!;
             }
             if (Get(typeInfo.Signature) is not TypeObject typeObject)
+                return null;
+            ATypeInstance? ret = typeObject.Instantiate(typeInfo, this);
+            if (ret != null && typeInfo.IsArray)
+                return new ArrayType(ret!);
+            return ret;
+        }
+
+        public ATypeInstance? Instantiate(TypeInfo typeInfo, int[] namespaces)
+        {
+            if (typeInfo.NamespacesID.Length == 0 && Types.TryGet(typeInfo.ID, out ATypeInstance? primitiveInstance))
+            {
+                if (typeInfo.IsArray)
+                    return new ArrayType(primitiveInstance!);
+                return primitiveInstance!;
+            }
+            List<Signature> searchedSignatures = [];
+            Signature? signature = Search<TypeObject>(namespaces, typeInfo.Signature, searchedSignatures);
+            if (signature == null || Get(signature) is not TypeObject typeObject)
                 return null;
             ATypeInstance? ret = typeObject.Instantiate(typeInfo, this);
             if (ret != null && typeInfo.IsArray)

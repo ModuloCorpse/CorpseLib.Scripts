@@ -36,6 +36,10 @@
 
             //Unary operators
             AddOperator("!", 0, false, false, true);
+
+            //Ternary operators
+            AddOperator("?", 0, false, false, false);
+            AddOperator(":", 0, false, false, false);
         }
 
         public void AddOperator(string @operator, int weight, bool isMutation, bool isCompoundable, bool isUnary) => m_Operators.Add(new Operator(@operator, weight, isMutation, isCompoundable, isUnary));

@@ -12,21 +12,20 @@ namespace CorpseLib.Scripts.Parser
     {
         public static ParserResult ParseScript(string str, Environment env)
         {
-            ParsingContext parsingContext = new();
+            ParsingContext parsingContext = new(env);
             List<AComment> comments = CommentAndTagParser.TrimComments(ref str, parsingContext);
             if (parsingContext.HasErrors)
                 return new(parsingContext.Error);
             int i = 0;
             Shell.Helper.TrimCommand(ref str);
-            Script script = new();
             //TODO Parse imports/include
-            NamespaceParser.LoadNamespaceContent(script, str, parsingContext);
+            NamespaceParser.LoadNamespaceContent(str, parsingContext);
             foreach (AComment comment in comments)
             {
                 Console.WriteLine("===== Comment {0} =====", i++);
                 Console.WriteLine(comment);
             }
-            return parsingContext.CreateParserResult(script, comments);
+            return parsingContext.CreateParserResult(comments);
         }
 
         public static ParserResult ParseScript(string str) => ParseScript(str, new Environment());

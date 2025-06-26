@@ -17,25 +17,11 @@ namespace CorpseLib.Scripts.Context
             internal object[]? Value => m_Value;
             internal int ID => m_ID;
 
-            public abstract Parameter? Instantiate(Dictionary<int, TypeInfo> templateTypeGiven, OldEnvironment env);
             public abstract Parameter? Instantiate(Dictionary<int, TypeInfo> templateTypeGiven, Environment env);
         }
 
         internal class AttributeDefinition(TypeInfo typeInfo, int[] tags, int[] comments, int id, object[]? value) : AAttributeDefinition(typeInfo, tags, comments, id, value)
         {
-            public override Parameter? Instantiate(Dictionary<int, TypeInfo> templateTypeGiven, OldEnvironment env)
-            {
-                ATypeInstance? parameterType = env.Instantiate(TypeInfo);
-                if (parameterType == null)
-                    return null;
-                if (parameterType is VoidType)
-                    throw new ArgumentException("Parameter type cannot be void");
-                if (Value != null)
-                    return new(parameterType, TypeInfo.IsConst, ID, parameterType.InternalConvert(Value));
-                else
-                    return new(parameterType, TypeInfo.IsConst, ID);
-            }
-
             public override Parameter? Instantiate(Dictionary<int, TypeInfo> templateTypeGiven, Environment env)
             {
                 ATypeInstance? parameterType = env.Instantiate(TypeInfo);
@@ -68,20 +54,6 @@ namespace CorpseLib.Scripts.Context
                         newTemplates.Add(ConvertTemplatedType(subTemplate, templateTypeGiven));
                 }
                 return new(baseType.IsConst, baseType.NamespacesID, baseType.ID, [..newTemplates], baseType.IsArray);
-            }
-
-            public override Parameter? Instantiate(Dictionary<int, TypeInfo> templateTypeGiven, OldEnvironment env)
-            {
-                TypeInfo resolvedTypeInfo = ConvertTemplatedType(TypeInfo, templateTypeGiven);
-                ATypeInstance? parameterType = env.Instantiate(resolvedTypeInfo);
-                if (parameterType == null)
-                    return null;
-                if (parameterType is VoidType)
-                    throw new ArgumentException("Parameter type cannot be void");
-                if (Value != null)
-                    return new(parameterType, TypeInfo.IsConst, ID, parameterType.InternalConvert(Value));
-                else
-                    return new(parameterType, TypeInfo.IsConst, ID);
             }
 
             public override Parameter? Instantiate(Dictionary<int, TypeInfo> templateTypeGiven, Environment env)
@@ -139,28 +111,6 @@ namespace CorpseLib.Scripts.Context
                 return false;
             m_Attributes.Add(new TemplateAttributeDefinition(typeInfo, tags, comments, id, value));
             return true;
-        }
-
-        internal ATypeInstance? Instantiate(TypeInfo typeInfo, OldEnvironment env)
-        {
-            if (typeInfo.TemplateTypes.Length != m_Templates.Length)
-                throw new ArgumentException("Invalid number of template");
-            Dictionary<int, TypeInfo> templateDictionary = [];
-            for (int n = 0; n != m_Templates.Length; ++n)
-                templateDictionary[m_Templates[n]] = typeInfo.TemplateTypes[n];
-            ObjectType type = new(typeInfo);
-            env.AddTemplateTypeInstance(typeInfo, type);
-            foreach (AAttributeDefinition attribute in m_Attributes)
-            {
-                Parameter? intance = attribute.Instantiate(templateDictionary, env);
-                if (intance == null)
-                {
-                    env.RemoveTemplateTypeInstance(typeInfo);
-                    return null;
-                }
-                type.AddAttribute(intance);
-            }
-            return type;
         }
 
         internal ATypeInstance? Instantiate(TypeInfo typeInfo, TypeObject typeObject, Environment env)

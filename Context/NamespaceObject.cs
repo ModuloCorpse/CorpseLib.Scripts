@@ -4,7 +4,7 @@
     {
         private readonly EnvironmentObjectDictionary m_Objects = new();
 
-        internal EnvironmentObjectDictionary Objects => m_Objects;
+        public EnvironmentObjectDictionary Objects => m_Objects;
 
         public override bool IsValid() => !m_Objects.IsEmpty;
         public void ClearInvalid() => m_Objects.ClearInvalid();

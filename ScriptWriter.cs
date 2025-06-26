@@ -255,9 +255,9 @@ namespace CorpseLib.Scripts
                 if (tmp is List<object[]> elements)
                 {
                     sb.Append('[');
-                    for (int i = 0; i != value.Length; ++i)
+                    for (int i = 0; i != elements.Count; ++i)
                     {
-                        object[] var = (value[i] as object[])!;
+                        object[] var = elements[i]!;
                         if (i != 0)
                             sb.Append(',');
                         sb.Append(' ');

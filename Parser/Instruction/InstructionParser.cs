@@ -13,32 +13,16 @@ namespace CorpseLib.Scripts.Parser.Instruction
             return [..ids];
         }
 
-        private static bool IsExpressionLiteral(AExpression expr)
-        {
-            if (expr is LiteralExpression)
-                return true;
-            else if (expr is AnonymousObjectExpression anonymousObjectExpression)
-            {
-                foreach (AExpression parameter in anonymousObjectExpression.Parameters)
-                {
-                    if (!IsExpressionLiteral(parameter))
-                        return false;
-                }
-                return true;
-            }
-            return false;
-        }
-
-        private static bool IsExpressionLiteralOrVariable(AExpression expr) => expr is VariableExpression || IsExpressionLiteral(expr);
+        private static bool IsExpressionLiteralOrVariable(AExpression expr) => expr is VariableExpression || expr is LiteralExpression;
 
         private static bool ShouldBeOptimizedAway(AExpression expression)
         {
             // If the expression is only a literal or an anonymous object with only literals, it can be optimized away.
-            if (IsExpressionLiteral(expression))
+            if (expression is LiteralExpression)
                 return true;
 
             // If the expression is a mutation expression and its target is a literal, it can also be optimized away.
-            if (expression is MutationExpression mutationExpression && IsExpressionLiteral(mutationExpression.Target))
+            if (expression is MutationExpression mutationExpression && mutationExpression.Target is LiteralExpression)
                 return true;
 
             // If the expression is a binary expression and its targets are literals, it can also be optimized away.
@@ -161,15 +145,41 @@ namespace CorpseLib.Scripts.Parser.Instruction
             return new(left);
         }
 
+        private static object[] ConvertAnonymousObject(AExpression expression)
+        {
+            if (expression is AnonymousObjectExpression anonymousObject)
+            {
+                List<object[]> values = [];
+                foreach (AExpression parameter in anonymousObject.Parameters)
+                    values.Add(ConvertAnonymousObject(parameter));
+                return anonymousObject.IsArray ? [values] : [..values];
+            }
+            return (expression as LiteralExpression)!.Value;
+        }
+
+        private static bool IsAnonymousObjectALiteral(AExpression expr)
+        {
+            if (expr is LiteralExpression)
+                return true;
+            else if (expr is AnonymousObjectExpression anonymousObjectExpression)
+            {
+                foreach (AExpression parameter in anonymousObjectExpression.Parameters)
+                {
+                    if (!IsAnonymousObjectALiteral(parameter))
+                        return false;
+                }
+                return true;
+            }
+            return false;
+        }
+
         private static OperationResult<AExpression> ParseTernaryExpression(TokenReader tokens, ParsingContext parsingContext, bool isReversed)
         {
             OperationResult<AExpression> result = ParsePrimary(tokens, parsingContext, isReversed);
             if (!result)
                 return result;
-            if (result.Result is AnonymousObjectExpression anonymousObject)
-            {
-
-            }
+            if (result.Result is AnonymousObjectExpression anonymousObject && IsAnonymousObjectALiteral(anonymousObject))
+                return new(new LiteralExpression(ConvertAnonymousObject(anonymousObject)));
 
             if (tokens.Current?.IsUnaryMutation ?? false)
             {

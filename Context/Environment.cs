@@ -1,5 +1,4 @@
-﻿using CorpseLib.Scripts.Type.Primitive;
-using CorpseLib.Scripts.Type;
+﻿using CorpseLib.Scripts.Type;
 using CorpseLib.Scripts.Instructions;
 
 namespace CorpseLib.Scripts.Context
@@ -7,7 +6,8 @@ namespace CorpseLib.Scripts.Context
     public class Environment
     {
         private readonly EnvironmentObjectDictionary m_Objects = new();
-        private readonly Dictionary<int, Variable> m_Variables = [];
+        private readonly Dictionary<int, Variable> m_Globals = [];
+        private readonly List<ATypeInstance> m_TypeTable = [..Types.PRIMITIVE_TYPES];
 
         public EnvironmentObjectDictionary Objects => m_Objects;
 
@@ -41,10 +41,31 @@ namespace CorpseLib.Scripts.Context
         }
 
         public void AddTypeDefinition(TypeDefinition type, int[] tags, int[] comments) => GetOrCreateTypeObject(type.Signature).AddTypeDefinition(type, tags, comments);
-        public void AddType(ATypeInstance type)
+        public int AddType(ATypeInstance type)
+        {
+            TypeInfo typeInfo = type.TypeInfo;
+            //TODO Add it's Type Index instead
+            if (m_Objects.Get(typeInfo.Signature, 0) is TypeObject existingTypeObject)
+            {
+                int typeIndex = m_TypeTable.Count;
+                m_TypeTable.Add(type);
+                existingTypeObject.AddTypeInstance(typeInfo, typeIndex);
+                return typeIndex;
+            }
+            return -1;
+        }
+
+        public ATypeInstance? GetTypeInstance(int typeIndex)
+        {
+            if (typeIndex < 0 || typeIndex >= m_TypeTable.Count)
+                return null;
+            return m_TypeTable[typeIndex];
+        }
+
+        public void RemoveType(ATypeInstance type)
         {
             if (m_Objects.Get(type.TypeInfo.Signature, 0) is TypeObject existingTypeObject)
-                existingTypeObject.AddTypeInstance(type);
+                existingTypeObject.RemoveType(type.TypeInfo);
         }
 
         private EnvironmentObject? Get(Signature signature) => m_Objects.Get(signature, 0);
@@ -67,50 +88,35 @@ namespace CorpseLib.Scripts.Context
             return null;
         }
 
-        public ATypeInstance? Instantiate(TypeInfo typeInfo)
+        private int GetTypeInfoIndex(TypeInfo typeInfo)
         {
-            if (typeInfo.NamespacesID.Length == 0 && Types.TryGet(typeInfo.ID, out ATypeInstance? primitiveInstance))
-            {
-                ATypeInstance arrayRet = primitiveInstance!;
-                for (int i = 0; i < typeInfo.ArrayCount; ++i)
-                    arrayRet = new ArrayType(arrayRet);
-                return arrayRet;
-            }
+            if (typeInfo.NamespacesID.Length == 0 && Types.TryGet(typeInfo.ID, out int primitiveInstance))
+                return primitiveInstance;
             if (Get(typeInfo.Signature) is not TypeObject typeObject)
-                return null;
-            ATypeInstance? ret = typeObject.Instantiate(typeInfo, this);
-            if (ret != null)
-            {
-                ATypeInstance arrayRet = ret!;
-                for (int i = 0; i < typeInfo.ArrayCount; ++i)
-                    arrayRet = new ArrayType(arrayRet);
-                return arrayRet;
-            }
-            return ret;
+                return -1;
+            return typeObject.Instantiate(typeInfo, this);
         }
 
-        public ATypeInstance? Instantiate(TypeInfo typeInfo, int[] namespaces)
+        public ParameterType? Instantiate(TypeInfo typeInfo)
         {
-            if (typeInfo.NamespacesID.Length == 0 && Types.TryGet(typeInfo.ID, out ATypeInstance? primitiveInstance))
-            {
-                ATypeInstance arrayRet = primitiveInstance!;
-                for (int i = 0; i < typeInfo.ArrayCount; ++i)
-                    arrayRet = new ArrayType(arrayRet);
-                return arrayRet;
-            }
+            int instanceIdx = GetTypeInfoIndex(typeInfo);
+            if (instanceIdx == -1)
+                return null;
+            return new(instanceIdx, typeInfo.IsStatic, typeInfo.IsConst, typeInfo.IsRef, typeInfo.ArrayCount);
+        }
+
+        public ParameterType? Instantiate(TypeInfo typeInfo, int[] namespaces)
+        {
+            if (typeInfo.NamespacesID.Length == 0 && Types.TryGet(typeInfo.ID, out int primitiveInstance))
+                return new(primitiveInstance, typeInfo.IsStatic, typeInfo.IsConst, typeInfo.IsRef, typeInfo.ArrayCount);
             List<Signature> searchedSignatures = [];
             Signature? signature = Search<TypeObject>(namespaces, typeInfo.Signature, searchedSignatures);
-            if (signature == null || Get(signature) is not TypeObject typeObject)
-                return null;
-            ATypeInstance? ret = typeObject.Instantiate(typeInfo, this);
-            if (ret != null)
+            if (signature != null)
             {
-                ATypeInstance arrayRet = ret!;
-                for (int i = 0; i < typeInfo.ArrayCount; ++i)
-                    arrayRet = new ArrayType(arrayRet);
-                return arrayRet;
+                TypeInfo resolvedTypeInfo = new(typeInfo.IsStatic, typeInfo.IsConst, typeInfo.IsRef, signature.Namespaces, signature.ID, typeInfo.TemplateTypes, typeInfo.ArrayCount);
+                return Instantiate(resolvedTypeInfo);
             }
-            return ret;
+            return null;
         }
     }
 }

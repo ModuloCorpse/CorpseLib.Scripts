@@ -1,4 +1,5 @@
-﻿using Environment = CorpseLib.Scripts.Context.Environment;
+﻿using CorpseLib.Scripts.Context;
+using Environment = CorpseLib.Scripts.Context.Environment;
 
 namespace CorpseLib.Scripts
 {
@@ -11,15 +12,15 @@ namespace CorpseLib.Scripts
         internal object? Call(Environment env, object?[] parameters)
         {
             FunctionStack stack = new();
-            int i = 0;
+            /*int i = 0;
             while (i != m_Signature.Parameters.Length)
             {
                 Parameter param = m_Signature.Parameters[i];
                 object? paramValue = parameters[i];
-                Variable? argument = null;
+                Variable argument;
                 if (paramValue == null)
                     argument = param.Instantiate();
-                else if (param.Type.IsOfType([paramValue]))
+                else
                     argument = param.Instantiate([paramValue]);
                 stack.AddVariable(param.ID, argument!);
                 ++i;
@@ -27,7 +28,7 @@ namespace CorpseLib.Scripts
             if (i > parameters.Length)
             {
                 return null;
-            }
+            }*/
             return InternalExecute(env, stack);
         }
 

@@ -141,14 +141,13 @@ namespace CorpseLib.Scripts.Parser
             return new CommentAndTags([.. commentIDs], [.. tags]);
         }
 
-        internal static List<AComment> TrimComments(ref string str, ParsingContext parsingContext)
+        internal static void TrimComments(ref string str, ParsingContext parsingContext)
         {
             bool inString = false;
             bool inMultiLineComment = false;
             bool inSingleLineComment = false;
             StringBuilder sb = new();
             StringBuilder commentBuilder = new();
-            List<AComment> comments = [];
             for (int i = 0; i < str.Length; ++i)
             {
                 char c = str[i];
@@ -159,8 +158,7 @@ namespace CorpseLib.Scripts.Parser
                         ++i;
                         inMultiLineComment = false;
                         string comment = commentBuilder.ToString().Trim();
-                        int commentID = comments.Count;
-                        comments.Add(new MultiLineComment(comment.Split('\n')));
+                        int commentID = parsingContext.AddComment(new MultiLineComment(comment.Split('\n')));
                         sb.Append($"/*{commentID}*/");
                         commentBuilder.Clear();
                     }
@@ -174,8 +172,7 @@ namespace CorpseLib.Scripts.Parser
                         commentBuilder.Append(c);
                         inSingleLineComment = false;
                         string comment = commentBuilder.ToString().Trim();
-                        int commentID = comments.Count;
-                        comments.Add(new SingleLineComment(comment));
+                        int commentID = parsingContext.AddComment(new SingleLineComment(comment));
                         sb.Append($"/*{commentID}*/");
                         commentBuilder.Clear();
                     }
@@ -219,15 +216,14 @@ namespace CorpseLib.Scripts.Parser
             if (inMultiLineComment)
             {
                 parsingContext.RegisterError("Comments error", "Unclosing comment");
-                return [];
+                return;
             }
             if (inString)
             {
                 parsingContext.RegisterError("Comments error", "Unclosing string");
-                return [];
+                return;
             }
             str = sb.ToString();
-            return comments;
         }
     }
 }

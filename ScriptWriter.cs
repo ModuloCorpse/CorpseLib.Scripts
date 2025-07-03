@@ -1,7 +1,7 @@
 ﻿using CorpseLib.Scripts.Context;
 using CorpseLib.Scripts.Instructions;
+using CorpseLib.Scripts.Operations;
 using CorpseLib.Scripts.Type;
-using CorpseLib.Scripts.Type.Primitive;
 using System.Text;
 using static CorpseLib.Scripts.Context.TypeDefinition;
 using static CorpseLib.Scripts.Context.TypeObject;
@@ -11,218 +11,35 @@ namespace CorpseLib.Scripts
 {
     public static class ScriptWriter
     {
-        public static void AppendValue(ScriptBuilder sb, ATypeInstance typeInstance, object[]? value)
+        public static void AppendTypeInstanceName(ScriptBuilder sb, Environment env, ParameterType type)
         {
-            if (value == null || typeInstance is VoidType)
-                return;
-            if (value.Length == 0)
+            int typeIndex = type.TypeID;
+            switch (typeIndex)
             {
-                sb.Append("null");
-                return;
-            }
-            else if (typeInstance is ArrayType arrayType)
-            {
-                sb.Append('[');
-                for (int i = 0; i != value.Length; ++i)
+                case 0: sb.Append("void"); break;
+                case 1: sb.Append("bool"); break;
+                case 2: sb.Append("char"); break;
+                case 3: sb.Append("uchar"); break;
+                case 4: sb.Append("short"); break;
+                case 5: sb.Append("ushort"); break;
+                case 6: sb.Append("int"); break;
+                case 7: sb.Append("uint"); break;
+                case 8: sb.Append("long"); break;
+                case 9: sb.Append("ulong"); break;
+                case 10: sb.Append("float"); break;
+                case 11: sb.Append("double"); break;
+                case 12: sb.Append("string"); break;
+                default:
                 {
-                    if (i != 0)
-                        sb.Append(',');
-                    sb.Append(' ');
-                    if (value[i] is Variable var)
-                        AppendValue(sb, arrayType.ElementType, var.Values);
-                    else
-                        throw new ArgumentException("Array is not valid");
+                    ATypeInstance? typeInstance = env.GetTypeInstance(typeIndex);
+                    if (typeInstance is ObjectType objectType)
+                        AppendTypeInfo(sb, objectType.TypeInfo);
+                    break;
                 }
-                if (value.Length != 0)
-                    sb.Append(' ');
-                sb.Append(']');
             }
-            else if (typeInstance is ObjectType objectType)
-            {
-                sb.Append('{');
-                for (int i = 0; i != value.Length; ++i)
-                {
-                    if (value[i] is Variable var)
-                    {
-                        if (!var.IsDefault())
-                        {
-                            if (i != 0)
-                                sb.Append(',');
-                            sb.Append(' ');
-                            AppendValue(sb, var.Type, var.Values);
-                        }
-                    }
-                    else
-                        throw new ArgumentException("Object is not valid");
-                }
-                if (value.Length != 0)
-                    sb.Append(' ');
-                sb.Append('}');
-            }
-            else if (typeInstance is ARawPrimitive && value.Length == 1)
-            {
-                object tmp = value[0];
-                if (typeInstance is StringType)
-                {
-                    sb.Append('"');
-                    sb.Append(tmp);
-                    sb.Append('"');
-                }
-                else if (typeInstance is BoolType && Helper.ChangeType(tmp, out bool b))
-                    sb.Append(b ? "true" : "false");
-                //Using byte and sbyte to implicitly convert string to char
-                else if (typeInstance is CharType && Helper.ChangeType(tmp, out sbyte sB))
-                    sb.Append((char)sB);
-                else if (typeInstance is UCharType && Helper.ChangeType(tmp, out byte c))
-                    sb.Append((char)c);
-                else
-                    sb.Append(tmp);
-            }
-        }
 
-        private static void AppendParameter(ScriptBuilder sb, Parameter parameter)
-        {
-            if (parameter.IsConst)
-                sb.Append("const ");
-            AppendTypeInstanceName(sb, parameter.Type);
-            sb.Append(' ');
-            sb.AppendID(parameter.ID);
-            if (parameter.DefaultValues != null)
-            {
-                sb.Append(" = ");
-                AppendValue(sb, parameter.Type, parameter.DefaultValues);
-            }
-        }
-
-        public static void AppendObjectType(ScriptBuilder sb, ObjectType objectType)
-        {
-            sb.Append("struct ");
-            AppendTypeInfo(sb, objectType.TypeInfo);
-            sb.Append(" { ");
-            foreach (Parameter attribute in objectType.Attributes)
-            {
-                AppendParameter(sb, attribute);
-                sb.Append("; ");
-            }
-            sb.Append('}');
-        }
-
-        public static void AppendTypeInstanceName(ScriptBuilder sb, ATypeInstance typeInstance)
-        {
-            if (typeInstance is ObjectType objectType)
-                AppendTypeInfo(sb, objectType.TypeInfo);
-            else if (typeInstance is ArrayType arrayType)
-            {
-                AppendTypeInstanceName(sb, arrayType.ElementType);
+            for (int i = 0; i < type.ArrayCount; i++)
                 sb.Append("[]");
-            }
-            else if (typeInstance is VoidType)
-                sb.Append("void");
-            else if (typeInstance is BoolType)
-                sb.Append("bool");
-            else if (typeInstance is ShortType)
-                sb.Append("short");
-            else if (typeInstance is UShortType)
-                sb.Append("ushort");
-            else if (typeInstance is CharType)
-                sb.Append("char");
-            else if (typeInstance is UCharType)
-                sb.Append("uchar");
-            else if (typeInstance is IntType)
-                sb.Append("int");
-            else if (typeInstance is UIntType)
-                sb.Append("uint");
-            else if (typeInstance is LongType)
-                sb.Append("long");
-            else if (typeInstance is ULongType)
-                sb.Append("ulong");
-            else if (typeInstance is FloatType)
-                sb.Append("float");
-            else if (typeInstance is DoubleType)
-                sb.Append("double");
-            else if (typeInstance is StringType)
-                sb.Append("string");
-        }
-
-        public static void AppendFunctionSignature(ScriptBuilder sb, FunctionSignature functionSignature)
-        {
-            sb.Append("fct ");
-            if (functionSignature.ReturnType is not VoidType)
-            {
-                AppendTypeInstanceName(sb, functionSignature.ReturnType);
-                sb.Append(' ');
-            }
-            sb.AppendID(functionSignature.ID);
-            sb.Append('(');
-            int i = 0;
-            foreach (Parameter p in functionSignature.Parameters)
-            {
-                if (i != 0)
-                    sb.Append(", ");
-                AppendParameter(sb, p);
-                ++i;
-            }
-            sb.Append(')');
-        }
-
-        public static void AppendTypeDefinitionName(ScriptBuilder sb, TypeDefinition typeDefinition)
-        {
-            sb.AppendID(typeDefinition.Signature.ID);
-            int[] templates = typeDefinition.Templates;
-            if (templates.Length == 0)
-                return;
-            sb.Append('<');
-            int i = 0;
-            foreach (int template in templates)
-            {
-                if (i != 0)
-                    sb.Append(", ");
-                sb.AppendID(template);
-                ++i;
-            }
-            sb.Append('>');
-        }
-
-        public static void AppendSignature(ScriptBuilder sb, Signature signature)
-        {
-            foreach (int namespaceID in signature.Namespaces)
-            {
-                sb.AppendID(namespaceID);
-                sb.Append('.');
-            }
-            sb.AppendID(signature.ID);
-        }
-
-        public static void AppendTypeInfo(ScriptBuilder sb, TypeInfo typeInfo)
-        {
-            if (typeInfo.IsConst)
-                sb.Append("const ");
-            AppendSignature(sb, typeInfo.Signature);
-            if (typeInfo.TemplateTypes.Length > 0)
-            {
-                sb.Append('<');
-                int i = 0;
-                foreach (TypeInfo templatedType in typeInfo.TemplateTypes)
-                {
-                    if (i != 0)
-                        sb.Append(", ");
-                    AppendTypeInfo(sb, templatedType);
-                    ++i;
-                }
-                sb.Append('>');
-            }
-            for (int i = 0; i != typeInfo.ArrayCount; ++i)
-                sb.Append("[]");
-        }
-
-        private static bool IsObject(object[] value)
-        {
-            foreach (object obj in value)
-            {
-                if (obj is not object[])
-                    return false;
-            }
-            return true;
         }
 
         public static void AppendAnonymousValue(ScriptBuilder sb, object[]? value)
@@ -281,6 +98,120 @@ namespace CorpseLib.Scripts
                 else
                     sb.Append(tmp);
             }
+        }
+
+        private static void AppendParameter(ScriptBuilder sb, Environment env, Parameter parameter)
+        {
+            if (parameter.IsConst)
+                sb.Append("const ");
+            AppendTypeInstanceName(sb, env, parameter.Type);
+            if (parameter.IsRef)
+                sb.Append('&');
+            sb.Append(' ');
+            sb.AppendID(parameter.ID);
+            if (parameter.DefaultValues != null)
+            {
+                sb.Append(" = ");
+                AppendAnonymousValue(sb, parameter.DefaultValues);
+            }
+        }
+
+        public static void AppendObjectType(ScriptBuilder sb, Environment env, ObjectType objectType)
+        {
+            sb.Append("struct ");
+            AppendTypeInfo(sb, objectType.TypeInfo);
+            sb.Append(" { ");
+            foreach (Parameter attribute in objectType.Attributes)
+            {
+                AppendParameter(sb, env, attribute);
+                sb.Append("; ");
+            }
+            sb.Append('}');
+        }
+
+        public static void AppendFunctionSignature(ScriptBuilder sb, Environment env, FunctionSignature functionSignature)
+        {
+            sb.Append("fct ");
+            if (functionSignature.ReturnType.TypeID != 0)
+            {
+                AppendTypeInstanceName(sb, env, functionSignature.ReturnType);
+                sb.Append(' ');
+            }
+            sb.AppendID(functionSignature.ID);
+            sb.Append('(');
+            int i = 0;
+            foreach (Parameter p in functionSignature.Parameters)
+            {
+                if (i != 0)
+                    sb.Append(", ");
+                AppendParameter(sb, env, p);
+                ++i;
+            }
+            sb.Append(')');
+        }
+
+        public static void AppendTypeDefinitionName(ScriptBuilder sb, TypeDefinition typeDefinition)
+        {
+            sb.AppendID(typeDefinition.Signature.ID);
+            int[] templates = typeDefinition.Templates;
+            if (templates.Length == 0)
+                return;
+            sb.Append('<');
+            int i = 0;
+            foreach (int template in templates)
+            {
+                if (i != 0)
+                    sb.Append(", ");
+                sb.AppendID(template);
+                ++i;
+            }
+            sb.Append('>');
+        }
+
+        public static void AppendSignature(ScriptBuilder sb, Signature signature)
+        {
+            foreach (int namespaceID in signature.Namespaces)
+            {
+                sb.AppendID(namespaceID);
+                sb.Append("::");
+            }
+            sb.AppendID(signature.ID);
+        }
+
+        public static void AppendTypeInfo(ScriptBuilder sb, TypeInfo typeInfo)
+        {
+            if (typeInfo.IsStatic)
+                sb.Append("static ");
+            if (typeInfo.IsConst)
+                sb.Append("const ");
+            AppendSignature(sb, typeInfo.Signature);
+            if (typeInfo.TemplateTypes.Length > 0)
+            {
+                sb.Append('<');
+                int i = 0;
+                foreach (TypeInfo templatedType in typeInfo.TemplateTypes)
+                {
+                    if (i != 0)
+                        sb.Append(", ");
+                    AppendTypeInfo(sb, templatedType);
+                    ++i;
+                }
+                sb.Append('>');
+            }
+            for (int i = 0; i != typeInfo.ArrayCount; ++i)
+                sb.Append("[]");
+            if (typeInfo.IsRef)
+                sb.Append('&');
+        }
+
+        private static bool IsObject(object[] value)
+        {
+            foreach (object obj in value)
+            {
+                if (obj is not object[])
+                    return false;
+            }
+            return true;
         }
 
         public static void AppendTypeDefinition(ScriptBuilder sb, TypeDefinition typeDefinition)
@@ -381,6 +312,34 @@ namespace CorpseLib.Scripts
             }
         }
 
+        private static void AppendBinaryOperationTreeNode(ScriptBuilder sb, AOperationTreeNode[] children, string @operator)
+        {
+            AppendOperationTreeNode(sb, children[0]);
+            sb.Append($" {@operator} ");
+            AppendOperationTreeNode(sb, children[1]);
+        }
+
+        private static void AppendOperationTreeNode(ScriptBuilder sb, AOperationTreeNode node)
+        {
+            AOperationTreeNode[] children = node.Children;
+            if (node is LiteralOperationNode literalOperation)
+                AppendAnonymousValue(sb, literalOperation.Value);
+            else if (node is VariableOperationNode variableOperation)
+            {
+
+            }
+            else if (node is CreateVariableOperationNode createVariableOperation)
+            {
+
+            }
+            else if (node is EqualityOperationNode equalityOperationNode)
+                AppendBinaryOperationTreeNode(sb, children, equalityOperationNode.IsNot ? "!=" : "==");
+            else if (node is AndOperationNode andOperationNode)
+                AppendBinaryOperationTreeNode(sb, children, "&&");
+            else if (node is OrOperationNode orOperationNode)
+                AppendBinaryOperationTreeNode(sb, children, "||");
+        }
+
         public static void AppendInstruction(ScriptBuilder sb, AInstruction instruction)
         {
             if (instruction is DebugInstruction debugInstruction)
@@ -398,11 +357,23 @@ namespace CorpseLib.Scripts
                 AppendWhile(sb, whileInstruction);
             else if (instruction is IfInstruction ifInstruction)
                 AppendIf(sb, ifInstruction);
+            else if (instruction is ReturnInstruction returnInstruction)
+            {
+                AOperationTreeNode? returnValue = returnInstruction.Operations;
+                if (returnValue == null)
+                    sb.Append("return;");
+                else
+                {
+                    sb.Append("return ");
+                    AppendOperationTreeNode(sb, returnValue);
+                sb.Append(';');
+                }
+            }
         }
 
-        public static void AppendFunction(ScriptBuilder sb, Function function)
+        public static void AppendFunction(ScriptBuilder sb, Environment env, Function function)
         {
-            AppendFunctionSignature(sb, function.Signature);
+            AppendFunctionSignature(sb, env, function.Signature);
             AInstruction[] instructions = function.Instructions;
             if (instructions.Length == 0)
                 sb.Append(" {}");
@@ -429,17 +400,17 @@ namespace CorpseLib.Scripts
             return sb.ToString();
         }
 
-        private static void AppendNamespaceToScriptString(ScriptBuilder sb, NamespaceObject @namespace)
+        private static void AppendNamespaceToScriptString(ScriptBuilder sb, Environment env, NamespaceObject @namespace)
         {
             sb.Append("namespace ");
             sb.AppendID(@namespace.ID);
             sb.AppendLine();
             sb.OpenScope();
-            AppendEnvironmentDictionnaryToScriptString(sb, @namespace.Objects);
+            AppendEnvironmentDictionnaryToScriptString(sb, env, @namespace.Objects);
             sb.CloseScope();
         }
 
-        private static void AppendEnvironmentObjectToScriptString(ScriptBuilder sb, EnvironmentObject envObject)
+        private static void AppendEnvironmentObjectToScriptString(ScriptBuilder sb, Environment env, EnvironmentObject envObject)
         {
             int[] comments = envObject.Comments;
             if (comments.Length != 0)
@@ -470,9 +441,9 @@ namespace CorpseLib.Scripts
             }
 
             if (envObject is NamespaceObject namespaceObject)
-                AppendNamespaceToScriptString(sb, namespaceObject);
+                AppendNamespaceToScriptString(sb, env, namespaceObject);
             else if (envObject is FunctionObject functionObj && functionObj.Function is Function function)
-                AppendFunction(sb, function);
+                AppendFunction(sb, env, function);
             else if (envObject is InstructionObject instructionObject)
                 AppendInstruction(sb, instructionObject.Instruction);
             else if (envObject is TypeObject typeObject)
@@ -491,7 +462,7 @@ namespace CorpseLib.Scripts
             }
         }
 
-        private static void AppendEnvironmentDictionnaryToScriptString(ScriptBuilder sb, EnvironmentObjectDictionary dict)
+        private static void AppendEnvironmentDictionnaryToScriptString(ScriptBuilder sb, Environment env, EnvironmentObjectDictionary dict)
         {
             int i = 0;
             foreach (var obj in dict.Objects)
@@ -501,7 +472,7 @@ namespace CorpseLib.Scripts
                     sb.AppendLine();
                     sb.AppendLine();
                 }
-                AppendEnvironmentObjectToScriptString(sb, obj);
+                AppendEnvironmentObjectToScriptString(sb, env, obj);
                 ++i;
             }
 
@@ -516,14 +487,14 @@ namespace CorpseLib.Scripts
             {
                 if (n != 0)
                     sb.AppendLine();
-                AppendEnvironmentObjectToScriptString(sb, instruction);
+                AppendEnvironmentObjectToScriptString(sb, env, instruction);
                 n++;
             }
         }
 
         public static void ToScriptString(ScriptBuilder sb, Environment env)
         {
-            AppendEnvironmentDictionnaryToScriptString(sb, env.Objects);
+            AppendEnvironmentDictionnaryToScriptString(sb, env, env.Objects);
         }
     }
 }

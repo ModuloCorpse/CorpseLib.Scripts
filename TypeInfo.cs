@@ -1,21 +1,26 @@
 ﻿using CorpseLib.Scripts.Context;
+using CorpseLib.Scripts.Parser;
 using System.Text;
 
 namespace CorpseLib.Scripts
 {
-    public class TypeInfo(bool isConst, int[] namespaces, int id, TypeInfo[] templates, int arrayCount) : IEquatable<TypeInfo?>
+    public class TypeInfo(bool isStatic, bool isConst, bool isRef, int[] namespaces, int id, TypeInfo[] templates, int arrayCount) : IEquatable<TypeInfo?>
     {
         private readonly TypeInfo[] m_TemplateTypes = templates;
         private readonly Signature m_Signature = new(namespaces, id);
         private readonly int m_ArrayCount = arrayCount;
+        private readonly bool m_IsStatic = isStatic;
         private readonly bool m_IsConst = isConst;
+        private readonly bool m_IsRef = isRef;
 
         public TypeInfo[] TemplateTypes => m_TemplateTypes;
         public Signature Signature => m_Signature;
         public int[] NamespacesID => m_Signature.Namespaces;
         public int ID => m_Signature.ID;
         public int ArrayCount => m_ArrayCount;
+        public bool IsStatic => m_IsStatic;
         public bool IsConst => m_IsConst;
+        public bool IsRef => m_IsRef;
 
         public static OperationResult<string[]> SplitTemplate(string template)
         {
@@ -62,14 +67,34 @@ namespace CorpseLib.Scripts
             return new([.. result]);
         }
 
-        public static OperationResult<TypeInfo> ParseStr(string typeToParse, ConversionTable conversionTable)
+        public static OperationResult<TypeInfo> ParseStr(string typeToParse, ParsingContext parsingContext)
         {
             string str = typeToParse.Trim();
-            bool isConst = false;
-            if (str.StartsWith("const "))
+            int isConst = 0;
+            int isStatic = 0;
+            while (str.StartsWith("static ") || str.StartsWith("const "))
             {
-                isConst = true;
-                str = str[6..];
+                if (str.StartsWith("const "))
+                {
+                    ++isConst;
+                    str = str[6..];
+                }
+                else if (str.StartsWith("static "))
+                {
+                    ++isStatic;
+                    str = str[7..];
+                }
+            }
+            if (isConst > 1)
+                parsingContext.RegisterWarning("Multiple const", $"Type '{typeToParse}' has multiple const definitions");
+            if (isStatic > 1)
+                parsingContext.RegisterWarning("Multiple static", $"Type '{typeToParse}' has multiple static definitions");
+
+            bool isRef = false;
+            while (str.EndsWith('&'))
+            {
+                isRef = true;
+                str = str[..^1];
             }
             int arrayCount = 0;
             while (str.EndsWith("[]"))
@@ -90,7 +115,7 @@ namespace CorpseLib.Scripts
                         return templateTypesStr.Cast<TypeInfo>();
                     foreach (string templateTypeStr in templateTypesStr.Result!)
                     {
-                        OperationResult<TypeInfo> templateTypeInfo = ParseStr(templateTypeStr, conversionTable);
+                        OperationResult<TypeInfo> templateTypeInfo = ParseStr(templateTypeStr, parsingContext);
                         if (!templateTypeInfo)
                             return templateTypeInfo;
                         templateTypes.Add(templateTypeInfo.Result!);
@@ -100,17 +125,17 @@ namespace CorpseLib.Scripts
                     return new("Parsed type error", $"Non-closing template in {typeToParse}");
             }
             List<int> namespaceIDs = [];
-            int idx = str.IndexOf('.');
+            int idx = str.IndexOf("::");
             while (idx != -1)
             {
                 string namespaceName = str[..idx];
                 if (string.IsNullOrEmpty(namespaceName))
                     return new("Parsed type error", $"Empty namespace in {typeToParse}");
-                namespaceIDs.Add(conversionTable.PushName(namespaceName));
-                str = str[(idx + 1)..];
-                idx = str.IndexOf('.');
+                namespaceIDs.Add(parsingContext.PushName(namespaceName));
+                str = str[(idx + 2)..];
+                idx = str.IndexOf("::");
             }
-            return new(new(isConst, [.. namespaceIDs], conversionTable.PushName(str), [.. templateTypes], arrayCount));
+            return new(new(isStatic > 0, isConst > 0, isRef, [.. namespaceIDs], parsingContext.PushName(str), [.. templateTypes], arrayCount));
         }
 
         public override bool Equals(object? obj) => Equals(obj as TypeInfo);

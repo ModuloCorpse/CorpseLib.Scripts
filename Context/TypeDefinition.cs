@@ -1,5 +1,4 @@
 ﻿using CorpseLib.Scripts.Type;
-using CorpseLib.Scripts.Type.Primitive;
 
 namespace CorpseLib.Scripts.Context
 {
@@ -24,15 +23,15 @@ namespace CorpseLib.Scripts.Context
         {
             public override Parameter? Instantiate(Dictionary<int, TypeInfo> templateTypeGiven, Environment env)
             {
-                ATypeInstance? parameterType = env.Instantiate(TypeInfo);
+                ParameterType? parameterType = env.Instantiate(TypeInfo);
                 if (parameterType == null)
                     return null;
-                if (parameterType is VoidType)
+                if (parameterType.TypeID == 0)
                     throw new ArgumentException("Parameter type cannot be void");
                 if (Value != null)
-                    return new(parameterType, TypeInfo.IsConst, ID, parameterType.InternalConvert(Value));
+                    return new(parameterType, ID, Value);
                 else
-                    return new(parameterType, TypeInfo.IsConst, ID);
+                    return new(parameterType, ID);
             }
         }
 
@@ -53,21 +52,21 @@ namespace CorpseLib.Scripts.Context
                     else
                         newTemplates.Add(ConvertTemplatedType(subTemplate, templateTypeGiven));
                 }
-                return new(baseType.IsConst, baseType.NamespacesID, baseType.ID, [..newTemplates], baseType.ArrayCount);
+                return new(baseType.IsStatic, baseType.IsConst, baseType.IsRef, baseType.NamespacesID, baseType.ID, [..newTemplates], baseType.ArrayCount);
             }
 
             public override Parameter? Instantiate(Dictionary<int, TypeInfo> templateTypeGiven, Environment env)
             {
                 TypeInfo resolvedTypeInfo = ConvertTemplatedType(TypeInfo, templateTypeGiven);
-                ATypeInstance? parameterType = env.Instantiate(resolvedTypeInfo);
+                ParameterType? parameterType = env.Instantiate(resolvedTypeInfo);
                 if (parameterType == null)
                     return null;
-                if (parameterType is VoidType)
+                if (parameterType.TypeID == 0)
                     throw new ArgumentException("Parameter type cannot be void");
                 if (Value != null)
-                    return new(parameterType, TypeInfo.IsConst, ID, parameterType.InternalConvert(Value));
+                    return new(parameterType, ID, Value);
                 else
-                    return new(parameterType, TypeInfo.IsConst, ID);
+                    return new(parameterType, ID);
             }
 
         }
@@ -113,7 +112,7 @@ namespace CorpseLib.Scripts.Context
             return true;
         }
 
-        internal ATypeInstance? Instantiate(TypeInfo typeInfo, TypeObject typeObject, Environment env)
+        internal int Instantiate(TypeInfo typeInfo, Environment env)
         {
             if (typeInfo.TemplateTypes.Length != m_Templates.Length)
                 throw new ArgumentException("Invalid number of template");
@@ -121,18 +120,18 @@ namespace CorpseLib.Scripts.Context
             for (int n = 0; n != m_Templates.Length; ++n)
                 templateDictionary[m_Templates[n]] = typeInfo.TemplateTypes[n];
             ObjectType type = new(typeInfo);
-            typeObject.AddTemplateTypeInstance(typeInfo, type);
+            int typeIndex = env.AddType(type);
             foreach (AAttributeDefinition attribute in m_Attributes)
             {
                 Parameter? intance = attribute.Instantiate(templateDictionary, env);
                 if (intance == null)
                 {
-                    typeObject.RemoveTemplateTypeInstance(typeInfo);
-                    return null;
+                    env.RemoveType(type);
+                    return -1;
                 }
                 type.AddAttribute(intance);
             }
-            return type;
+            return typeIndex;
         }
     }
 }

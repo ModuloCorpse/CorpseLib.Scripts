@@ -12,23 +12,11 @@
 
         public void AddVariable(int id, Variable value) => m_Variables[id] = value;
 
-        public Variable? GetVariable(int[] ids)
+        public Variable? GetVariable(int id)
         {
-            if (ids.Length == 0)
-                return null;
-            if (m_Variables.TryGetValue(ids[0], out var value))
-            {
-                for (int i = 1; i != ids.Length; ++i)
-                {
-                    Variable? subValue = value.GetSubValue(ids[i]);
-                    if (subValue != null)
-                        value = subValue;
-                    else
-                        return null;
-                }
+            if (m_Variables.TryGetValue(id, out var value))
                 return value;
-            }
-            return m_Parent?.GetVariable(ids);
+            return m_Parent?.GetVariable(id);
         }
     }
 }

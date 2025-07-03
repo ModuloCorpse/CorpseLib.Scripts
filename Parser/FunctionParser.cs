@@ -147,19 +147,37 @@ namespace CorpseLib.Scripts.Parser
                 for (int i = 0; i != parametersStrArr.Length; ++i)
                 {
                     Parameter? result = ParameterParser.ParseParameter(parametersStrArr[i], parsingContext);
-                    if (parsingContext.HasErrors)
+                    if (parsingContext.HasErrors || result == null)
                         return null;
-                    parameters.Add(result!);
+                    bool isOptimized = false;
+                    bool isConst = result.IsConst;
+                    bool isRef = result.IsRef;
+
+                    if (result.IsStatic)
+                    {
+                        isOptimized = true;
+                        parsingContext.RegisterWarning("Static parameter in function signature", $"Static parameter has been optimized without staticness in {functionName}");
+                    }
+                    if (isConst && !isRef)
+                    {
+                        isRef = true;
+                        isOptimized = true;
+                        parsingContext.RegisterWarning("Const without reference in function signature", $"Const parameter has been optimized with a reference in {functionName}");
+                    }
+                    if (isOptimized)
+                        parameters.Add(new Parameter(new ParameterType(result.TypeID, false, isConst, isRef, result.ArrayCount), result.ID, result.DefaultValues));
+                    else
+                        parameters.Add(result);
                 }
             }
 
-            OperationResult<TypeInfo> returnTypeInfo = TypeInfo.ParseStr(returnTypeStr, parsingContext.ConversionTable);
+            OperationResult<TypeInfo> returnTypeInfo = TypeInfo.ParseStr(returnTypeStr, parsingContext);
             if (!returnTypeInfo)
             {
                 parsingContext.RegisterError(returnTypeInfo.Error, returnTypeInfo.Description);
                 return null;
             }
-            ATypeInstance? returnType = parsingContext.Instantiate(returnTypeInfo.Result!);
+            ParameterType? returnType = parsingContext.Instantiate(returnTypeInfo.Result!);
             if (returnType == null)
             {
                 parsingContext.RegisterError("Misformated function signature string", $"Unknown return type : {returnTypeStr}");

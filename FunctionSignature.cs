@@ -1,14 +1,12 @@
-﻿using CorpseLib.Scripts.Type;
-
-namespace CorpseLib.Scripts
+﻿namespace CorpseLib.Scripts
 {
-    public class FunctionSignature(ATypeInstance returnType, int id, Parameter[] parameters)
+    public class FunctionSignature(ParameterType returnType, int id, Parameter[] parameters)
     {
-        private readonly ATypeInstance m_ReturnType = returnType;
+        private readonly ParameterType m_ReturnType = returnType;
         private readonly Parameter[] m_Parameters = parameters;
         private readonly int m_ID = id;
 
-        public ATypeInstance ReturnType => m_ReturnType;
+        public ParameterType ReturnType => m_ReturnType;
         public int ID => m_ID;
         public Parameter[] Parameters => m_Parameters;
 

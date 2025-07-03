@@ -10,18 +10,18 @@ namespace CorpseLib.Scripts.Context
             private class TypeInstanceHolderTreeNode
             {
                 private readonly Dictionary<int, TypeInstanceHolderTreeNode> m_TypeInstances = [];
-                private ATypeInstance? m_Value = null;
+                private int m_Value = -1;
 
-                public ATypeInstance? SearchTypeInstance(TypeInfo[] typeInfos, int idx)
+                public int SearchTypeInstance(TypeInfo[] typeInfos, int idx)
                 {
                     if (idx >= typeInfos.Length)
                         return m_Value;
                     else if (m_TypeInstances.TryGetValue(typeInfos[idx].ID, out TypeInstanceHolderTreeNode? node))
                         return node.SearchTypeInstance(typeInfos, idx + 1);
-                    return null;
+                    return -1;
                 }
 
-                public void InsertTypeInstance(TypeInfo[] typeInfos, int idx, ATypeInstance value)
+                public void InsertTypeInstance(TypeInfo[] typeInfos, int idx, int value)
                 {
                     if (idx >= typeInfos.Length)
                     {
@@ -42,44 +42,36 @@ namespace CorpseLib.Scripts.Context
                 {
                     if (idx >= typeInfos.Length)
                     {
-                        m_Value = null;
+                        m_Value = -1;
                         return;
                     }
                     else if (m_TypeInstances.TryGetValue(typeInfos[idx].ID, out TypeInstanceHolderTreeNode? node))
                     {
                         node.RemoveTypeInstance(typeInfos, idx + 1);
-                        if (node.m_Value == null && node.m_TypeInstances.Count == 0)
+                        if (node.m_Value == -1 && node.m_TypeInstances.Count == 0)
                             m_TypeInstances.Remove(typeInfos[idx].ID);
                     }
-                }
-
-                public void AppendToList(List<ATypeInstance> list)
-                {
-                    if (m_Value != null)
-                        list.Add(m_Value);
-                    foreach (TypeInstanceHolderTreeNode node in m_TypeInstances.Values)
-                        node.AppendToList(list);
                 }
             }
 
             private readonly Dictionary<int, TypeInstanceHolderTreeNode> m_TemplateInstances = [];
 
-            public bool TryGetValue(TypeInfo typeInfo, [MaybeNullWhen(false)] out ATypeInstance value)
+            public bool TryGetValue(TypeInfo typeInfo, [MaybeNullWhen(false)] out int value)
             {
                 if (m_TemplateInstances.TryGetValue(typeInfo.ID, out TypeInstanceHolderTreeNode? node))
                 {
-                    ATypeInstance? ret = node.SearchTypeInstance(typeInfo.TemplateTypes, 0);
-                    if (ret != null)
+                    int ret = node.SearchTypeInstance(typeInfo.TemplateTypes, 0);
+                    if (ret != -1)
                     {
                         value = ret;
                         return true;
                     }
                 }
-                value = null;
+                value = -1;
                 return false;
             }
 
-            public void Add(TypeInfo typeInfo, ATypeInstance value)
+            public void Add(TypeInfo typeInfo, int value)
             {
                 if (m_TemplateInstances.TryGetValue(typeInfo.ID, out TypeInstanceHolderTreeNode? node))
                     node.InsertTypeInstance(typeInfo.TemplateTypes, 0, value);
@@ -95,17 +87,6 @@ namespace CorpseLib.Scripts.Context
             {
                 if (m_TemplateInstances.TryGetValue(typeInfo.ID, out TypeInstanceHolderTreeNode? node))
                     node.RemoveTypeInstance(typeInfo.TemplateTypes, 0);
-            }
-
-            public ATypeInstance[] Values
-            {
-                get
-                {
-                    List<ATypeInstance> ret = [];
-                    foreach (TypeInstanceHolderTreeNode node in m_TemplateInstances.Values)
-                        node.AppendToList(ret);
-                    return [.. ret];
-                }
             }
         }
 
@@ -136,19 +117,17 @@ namespace CorpseLib.Scripts.Context
         }
         public TypeDefinitionObject[] Values => [.. m_TypeDefinitions.Values];
 
-        public void AddTypeInstance(ATypeInstance type) => m_TypeInstances.Add(type.TypeInfo, type);
+        public void AddTypeInstance(TypeInfo type, int index) => m_TypeInstances.Add(type, index);
         public void AddTypeDefinition(TypeDefinition type, int[] tags, int[] comments) => m_TypeDefinitions[type.Templates.Length] = new(type, tags, comments);
+        public void RemoveType(TypeInfo typeInfo) => m_TypeInstances.Remove(typeInfo);
 
-        internal void AddTemplateTypeInstance(TypeInfo typeInfo, ATypeInstance type) => m_TypeInstances.Add(typeInfo, type);
-        internal void RemoveTemplateTypeInstance(TypeInfo typeInfo) => m_TypeInstances.Remove(typeInfo);
-
-        public ATypeInstance? Instantiate(TypeInfo typeInfo, Environment env)
+        public int Instantiate(TypeInfo typeInfo, Environment env)
         {
-            if (m_TypeInstances.TryGetValue(typeInfo, out ATypeInstance? templateObjectInstance))
-                return templateObjectInstance;
+            if (m_TypeInstances.TryGetValue(typeInfo, out int templateObjectInstanceIndex))
+                return templateObjectInstanceIndex;
             else if (m_TypeDefinitions.TryGetValue(typeInfo.TemplateTypes.Length, out TypeDefinitionObject? ret))
-                return ret.TypeDefinition.Instantiate(typeInfo, this, env);
-            return null;
+                return ret.TypeDefinition.Instantiate(typeInfo, env);
+            return -1;
         }
 
         public override bool IsValid() => true;

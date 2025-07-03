@@ -5,21 +5,30 @@ using Environment = CorpseLib.Scripts.Context.Environment;
 
 namespace CorpseLib.Scripts.Parser
 {
-    public class ParsingContext(Environment environment)
+    public class ParsingContext(Environment environment, List<AComment> comments)
     {
         private readonly Environment m_Environment = environment;
         private readonly Environment m_LoadedEnvironment = new();
         private readonly ConversionTable m_ConversionTable = new();
-        private readonly List<int> m_Namespaces = [];
+        private readonly List<AComment> m_Comments = comments;
         private readonly List<string> m_Warnings = [];
+        private readonly List<int> m_Namespaces = [];
         private string m_Error = string.Empty;
         private bool m_HasErrors = false;
 
+        public Environment LoadedEnvironment => m_LoadedEnvironment;
         public ConversionTable ConversionTable => m_ConversionTable;
+        public AComment[] Comments => [..m_Comments];
+        public string[] Warnings => [.. m_Warnings];
         public int[] Namespaces => [.. m_Namespaces];
-        public string[] Warnings => [..m_Warnings];
         public string Error => m_Error;
         public bool HasErrors => m_HasErrors;
+
+        internal int AddComment(AComment comment)
+        {
+            m_Comments.Add(comment);
+            return m_Comments.Count - 1;
+        }
 
         public void ClearWarnings() => m_Warnings.Clear();
         public void ClearErrors()
@@ -28,37 +37,37 @@ namespace CorpseLib.Scripts.Parser
             m_HasErrors = false;
         }
 
-        public void RegisterWarning(string warning, string description) => m_Warnings.Add($"WARNING : {warning} : {description}");
+        internal void RegisterWarning(string warning, string description) => m_Warnings.Add($"WARNING : {warning} : {description}");
 
-        public void RegisterError(string error, string description)
+        internal void RegisterError(string error, string description)
         {
             m_Error = $"ERROR : {error} : {description}";
             m_HasErrors = true;
         }
 
-        public bool PushFunction(AFunction function, int[] tags, int[] comments) =>
+        internal bool PushFunction(AFunction function, int[] tags, int[] comments) =>
             m_Environment.AddFunction([.. m_Namespaces], function, tags, comments) &&
             m_LoadedEnvironment.AddFunction([.. m_Namespaces], function, tags, comments);
 
-        public void PushInstruction(AInstruction instruction, int[] tags, int[] comments)
+        internal void PushInstruction(AInstruction instruction, int[] tags, int[] comments)
         {
             m_Environment.AddInstruction(instruction, [.. m_Namespaces], tags, comments);
             m_LoadedEnvironment.AddInstruction(instruction, [.. m_Namespaces], tags, comments);
         }
 
-        public void PushTypeDefinition(TypeDefinition typeDefinition, int[] tags, int[] comments)
+        internal void PushTypeDefinition(TypeDefinition typeDefinition, int[] tags, int[] comments)
         {
             m_Environment.AddTypeDefinition(typeDefinition, tags, comments);
             m_LoadedEnvironment.AddTypeDefinition(typeDefinition, tags, comments);
         }
 
-        public void PushType(ATypeInstance type)
+        internal void PushType(ATypeInstance type)
         {
             m_Environment.AddType(type);
             m_LoadedEnvironment.AddType(type);
         }
 
-        public bool PushNamespace(string @namespace, int[] tags, int[] comments)
+        internal bool PushNamespace(string @namespace, int[] tags, int[] comments)
         {
             int namespaceID = m_ConversionTable.PushName(@namespace);
             if (m_Environment.AddNamespace([.. m_Namespaces], namespaceID, tags, comments) &&
@@ -70,17 +79,10 @@ namespace CorpseLib.Scripts.Parser
             return false;
         }
 
-        public void PopNamespace() => m_Namespaces.RemoveAt(m_Namespaces.Count - 1);
+        internal void PopNamespace() => m_Namespaces.RemoveAt(m_Namespaces.Count - 1);
 
-        public int PushName(string name) => m_ConversionTable.PushName(name);
+        internal int PushName(string name) => m_ConversionTable.PushName(name);
 
-        public ParserResult CreateParserResult(List<AComment> comments)
-        {
-            if (m_HasErrors)
-                return new ParserResult(m_Error);
-            return new ParserResult(m_LoadedEnvironment, m_ConversionTable, comments);
-        }
-
-        public ATypeInstance? Instantiate(TypeInfo typeInfo) => m_LoadedEnvironment.Instantiate(typeInfo, [..m_Namespaces]);
+        internal ParameterType? Instantiate(TypeInfo typeInfo) => m_LoadedEnvironment.Instantiate(typeInfo, [..m_Namespaces]);
     }
 }

@@ -10,24 +10,18 @@ namespace CorpseLib.Scripts.Parser
     // - functions
     public static class ScriptParser
     {
-        public static ParserResult ParseScript(string str, Environment env)
+        public static ParsingContext ParseScript(string str, Environment env)
         {
-            ParsingContext parsingContext = new(env);
-            List<AComment> comments = CommentAndTagParser.TrimComments(ref str, parsingContext);
+            ParsingContext parsingContext = new(env, []);
+            CommentAndTagParser.TrimComments(ref str, parsingContext);
             if (parsingContext.HasErrors)
-                return new(parsingContext.Error);
-            int i = 0;
+                return parsingContext;
             Shell.Helper.TrimCommand(ref str);
             //TODO Parse imports/include
             NamespaceParser.LoadNamespaceContent(str, parsingContext);
-            foreach (AComment comment in comments)
-            {
-                Console.WriteLine("===== Comment {0} =====", i++);
-                Console.WriteLine(comment);
-            }
-            return parsingContext.CreateParserResult(comments);
+            return parsingContext;
         }
 
-        public static ParserResult ParseScript(string str) => ParseScript(str, new Environment());
+        public static ParsingContext ParseScript(string str) => ParseScript(str, new Environment());
     }
 }

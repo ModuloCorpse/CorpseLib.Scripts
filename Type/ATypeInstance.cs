@@ -2,23 +2,16 @@
 {
     public abstract class ATypeInstance
     {
-        private readonly TypeInfo? m_TypeInfo;
+        private readonly TypeInfo m_TypeInfo;
+        private readonly bool m_IsPrimitive;
 
-        public TypeInfo TypeInfo => m_TypeInfo!;
+        public TypeInfo TypeInfo => m_TypeInfo;
+        public bool IsPrimitive => m_IsPrimitive;
 
-        internal ATypeInstance(TypeInfo? typeInfo)
+        internal ATypeInstance(TypeInfo typeInfo, bool isPrimitive)
         {
-            m_TypeInfo = typeInfo;
+            m_TypeInfo = typeInfo!;
+            m_IsPrimitive = isPrimitive;
         }
-
-        internal object[]? InternalConvert(object[] value)
-        {
-            if (value.Length == 0)
-                return [];
-            return Convert(value);
-        }
-
-        public abstract bool IsOfType(object[]? value);
-        public abstract object[]? Convert(object[] str);
     }
 }

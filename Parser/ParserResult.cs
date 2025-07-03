@@ -32,5 +32,10 @@ namespace CorpseLib.Scripts.Parser
         }
 
         internal void AddWarnings(List<string> warnings) => m_Warnings.AddRange(warnings);
+
+        public void CreateParsingContext(Environment environment)
+        {
+
+        }
     }
 }

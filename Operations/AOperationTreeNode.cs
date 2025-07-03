@@ -1,24 +1,30 @@
-﻿using CorpseLib.Scripts.Parser;
+﻿using CorpseLib.Scripts.Context;
+using CorpseLib.Scripts.Parser;
 using Environment = CorpseLib.Scripts.Context.Environment;
 
 namespace CorpseLib.Scripts.Operations
 {
     public abstract class AOperationTreeNode
     {
-        private readonly List<AOperationTreeNode> m_Children = [];
-        private TypeInfo? m_ReturnType = null;
+        protected readonly List<AOperationTreeNode> m_Children = [];
 
-        protected AOperationTreeNode[] Children => [..m_Children];
+        internal AOperationTreeNode[] Children => [..m_Children];
 
-        internal bool Is(TypeInfo instance, ParsingContext parsingContext)
+        internal virtual bool IsBooleanOperation => false;
+
+        internal bool Validate(ParsingContext parsingContext, string instructionStr)
         {
-            if (m_ReturnType == null)
-                m_ReturnType = EvaluateReturnType(parsingContext);
-            return m_ReturnType != null && m_ReturnType == instance;
+            foreach (AOperationTreeNode child in m_Children)
+            {
+                if (!child.Validate(parsingContext, instructionStr))
+                    return false;
+            }
+            return IsValid(parsingContext, instructionStr);
         }
-        protected abstract TypeInfo? EvaluateReturnType(ParsingContext parsingContext);
 
-        internal object CallOperation(Environment env, FunctionStack functionStack) => Execute(env, functionStack);
-        protected abstract object Execute(Environment env, FunctionStack functionStack);
+        protected abstract bool IsValid(ParsingContext parsingContext, string instructionStr);
+
+        internal object[] CallOperation(Environment env, FunctionStack functionStack) => Execute(env, functionStack);
+        protected abstract object[] Execute(Environment env, FunctionStack functionStack);
     }
 }

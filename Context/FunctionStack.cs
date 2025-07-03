@@ -1,6 +1,4 @@
-﻿using CorpseLib.Scripts.Context;
-
-namespace CorpseLib.Scripts
+﻿namespace CorpseLib.Scripts.Context
 {
     public class FunctionStack
     {
@@ -20,7 +18,7 @@ namespace CorpseLib.Scripts
 
         public void AddVariable(int id, Variable value) => m_VariableScope.AddVariable(id, value);
 
-        public Variable? GetVariable(int[] ids) => m_VariableScope.GetVariable(ids);
+        public Variable? GetVariable(int id) => m_VariableScope.GetVariable(id);
 
         public void Return() => m_HasReturn = true;
 

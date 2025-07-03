@@ -1,4 +1,5 @@
-﻿using Environment = CorpseLib.Scripts.Context.Environment;
+﻿using CorpseLib.Scripts.Context;
+using Environment = CorpseLib.Scripts.Context.Environment;
 
 namespace CorpseLib.Scripts.Instructions
 {

@@ -6,6 +6,7 @@ namespace CorpseLib.Scripts.Parser.Instruction
     {
         private readonly List<ExpressionToken> m_Tokens = [];
         private int m_Position = 0;
+        private int m_SavedPos = 0;
 
         public ExpressionToken? this[int offset]
         {
@@ -38,10 +39,28 @@ namespace CorpseLib.Scripts.Parser.Instruction
                     bool isIdentifier = true;
                     while (i < input.Length && isIdentifier)
                     {
-                        if (char.IsLetterOrDigit(input[i]) || input[i] == '_' || input[i] == '.')
+                        if (char.IsWhiteSpace(input[i]))
+                        {
+                            string currentLiteralToken = sb.ToString();
+                            if (currentLiteralToken.EndsWith("const") || currentLiteralToken.EndsWith("static"))
+                            {
+                                sb.Append(' ');
+                                i++;
+                            }
+                            else if (currentLiteralToken.EndsWith("const ") || currentLiteralToken.EndsWith("static "))
+                                i++;
+                            else
+                                isIdentifier = false;
+                        }
+                        if (char.IsLetterOrDigit(input[i]) || input[i] == '_')
                         {
                             sb.Append(input[i]);
                             i++;
+                        }
+                        else if (input[i] == ':' && i + 1 < input.Length && input[i + 1] == ':' && sb[^1] != ':')
+                        {
+                            sb.Append("::");
+                            i += 2;
                         }
                         else if (input[i] == '[' && i + 1 < input.Length && input[i + 1] == ']')
                         {
@@ -76,6 +95,12 @@ namespace CorpseLib.Scripts.Parser.Instruction
                             }
                             if (!templateFound)
                                 isIdentifier = false;
+                        }
+                        else if (input[i] == '&' && i + 1 < input.Length && char.IsWhiteSpace(input[i + 1]))
+                        {
+                            sb.Append('&');
+                            i++;
+                            isIdentifier = false;
                         }
                         else
                             isIdentifier = false;
@@ -149,6 +174,8 @@ namespace CorpseLib.Scripts.Parser.Instruction
             }
         }
 
+        public void SavePos() => m_SavedPos = m_Position;
+        public void RestorePos() => m_Position = m_SavedPos;
         public void Pop() => m_Position++;
     }
 }

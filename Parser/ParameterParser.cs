@@ -1,13 +1,10 @@
-﻿using CorpseLib.Scripts.Type.Primitive;
-using CorpseLib.Scripts.Type;
-
-namespace CorpseLib.Scripts.Parser
+﻿namespace CorpseLib.Scripts.Parser
 {
     internal static class ParameterParser
     {
-        internal static string[] SplitParameter(string parameter, out bool isConst, ParsingContext parsingContext)
+        internal static string[] SplitParameter(string parameter, ParsingContext parsingContext)
         {
-            isConst = false;
+            bool isConst = false;
             if (string.IsNullOrEmpty(parameter))
             {
                 parsingContext.RegisterError("Misformated parameter string", "Empty parameter");
@@ -39,6 +36,8 @@ namespace CorpseLib.Scripts.Parser
                     parsingContext.RegisterError("Misformated parameter string", "Parameter should be [type] [name] = [value]");
                     return [];
                 }
+                if (isConst)
+                    parameterParts[0] = $"const {parameterParts[0]}";
                 ret.AddRange(parameterParts);
                 ret.Add(value);
             }
@@ -63,22 +62,23 @@ namespace CorpseLib.Scripts.Parser
                 return null;
             }
             //TODO : Do not loose constness (Maybe use a TypeInfo)
-            string[] parameterParts = SplitParameter(parameter, out bool isConst, parsingContext);
+            string[] parameterParts = SplitParameter(parameter, parsingContext);
             if (parsingContext.HasErrors)
                 return null;
-            OperationResult<TypeInfo> typeInfo = TypeInfo.ParseStr(parameterParts[0], parsingContext.ConversionTable);
-            if (!typeInfo)
+            OperationResult<TypeInfo> typeInfoResult = TypeInfo.ParseStr(parameterParts[0], parsingContext);
+            if (!typeInfoResult)
             {
-                parsingContext.RegisterError(typeInfo.Error, typeInfo.Description);
+                parsingContext.RegisterError(typeInfoResult.Error, typeInfoResult.Description);
                 return null;
             }
-            ATypeInstance? parameterType = parsingContext.Instantiate(typeInfo.Result!);
+            TypeInfo typeInfo = typeInfoResult.Result!;
+            ParameterType? parameterType = parsingContext.Instantiate(typeInfo);
             if (parameterType == null)
             {
                 parsingContext.RegisterError("Unknown parameter type", parameterParts[0]);
                 return null;
             }
-            if (parameterType is VoidType)
+            if (parameterType.TypeID == 0)
             {
                 parsingContext.RegisterError("Invalid script", "Parameter type cannot be void");
                 return null;
@@ -87,9 +87,9 @@ namespace CorpseLib.Scripts.Parser
             if (parameterParts.Length == 3)
                 value = ValueParser.ParseValue(parameterParts[2], parsingContext);
             if (value != null)
-                return new Parameter(parameterType, isConst, parsingContext.PushName(parameterParts[1]), parameterType.InternalConvert(value));
+                return new Parameter(parameterType, parsingContext.PushName(parameterParts[1]), value);
             else
-                return new Parameter(parameterType, isConst, parsingContext.PushName(parameterParts[1]));
+                return new Parameter(parameterType, parsingContext.PushName(parameterParts[1]));
         }
     }
 }

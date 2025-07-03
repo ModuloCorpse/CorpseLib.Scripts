@@ -1,4 +1,5 @@
-﻿using CorpseLib.Scripts.Parser.Instruction.Expressions;
+﻿using CorpseLib.Scripts.Context;
+using CorpseLib.Scripts.Parser.Instruction.Expressions;
 using Environment = CorpseLib.Scripts.Context.Environment;
 
 namespace CorpseLib.Scripts.Instructions

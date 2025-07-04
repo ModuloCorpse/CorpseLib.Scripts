@@ -1,4 +1,5 @@
 ﻿using CorpseLib.Scripts.Context;
+using CorpseLib.Scripts.Memory;
 using CorpseLib.Scripts.Parser;
 using Environment = CorpseLib.Scripts.Context.Environment;
 
@@ -8,13 +9,13 @@ namespace CorpseLib.Scripts.Operations
     {
         internal override bool IsBooleanOperation => true;
 
-        protected override object[] Execute(Environment env, FunctionStack functionStack)
+        protected override IMemoryValue Execute(Environment env, FunctionStack functionStack)
         {
-            object[] leftValue = m_Children[0].CallOperation(env, functionStack);
-            if ((bool)leftValue[0])
-                return [true];
-            object[] rightValue = m_Children[1].CallOperation(env, functionStack);
-            return [(bool)rightValue[0]];
+            IMemoryValue leftValue = m_Children[0].CallOperation(env, functionStack);
+            if (leftValue is LiteralValue leftLiteralValue && (bool)leftLiteralValue.Value == true)
+                return new LiteralValue(true);
+            IMemoryValue rightValue = m_Children[1].CallOperation(env, functionStack);
+            return new LiteralValue(rightValue is LiteralValue rightLiteralValue && (bool)rightLiteralValue.Value);
         }
 
         protected override bool IsValid(ParsingContext parsingContext, string instructionStr)

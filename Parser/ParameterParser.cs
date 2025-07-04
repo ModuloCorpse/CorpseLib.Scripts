@@ -1,4 +1,6 @@
-﻿namespace CorpseLib.Scripts.Parser
+﻿using CorpseLib.Scripts.Memory;
+
+namespace CorpseLib.Scripts.Parser
 {
     internal static class ParameterParser
     {
@@ -83,7 +85,7 @@
                 parsingContext.RegisterError("Invalid script", "Parameter type cannot be void");
                 return null;
             }
-            object[]? value = null;
+            IMemoryValue? value = null;
             if (parameterParts.Length == 3)
                 value = ValueParser.ParseValue(parameterParts[2], parsingContext);
             if (value != null)

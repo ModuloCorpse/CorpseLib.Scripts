@@ -2,6 +2,7 @@
 using CorpseLib.Scripts.Type;
 using static CorpseLib.Scripts.Parser.CommentAndTagParser;
 using System.Text;
+using CorpseLib.Scripts.Memory;
 
 namespace CorpseLib.Scripts.Parser
 {
@@ -119,7 +120,7 @@ namespace CorpseLib.Scripts.Parser
                     }
                     TypeInfo attributeTypeInfo = attributeTypeInfoResult.Result!;
                     int nameID = parsingContext.PushName(parameterParts[1]);
-                    object[]? value = (parameterParts.Length == 3) ? ValueParser.ParseValue(parameterParts[2], parsingContext) : null;
+                    IMemoryValue? value = (parameterParts.Length == 3) ? ValueParser.ParseValue(parameterParts[2], parsingContext) : null;
                     ParameterType? parameterType = parsingContext.Instantiate(attributeTypeInfo);
                     if (parameterType != null)
                     {

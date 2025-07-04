@@ -1,25 +1,26 @@
-﻿using CorpseLib.Scripts.Type;
+﻿using CorpseLib.Scripts.Memory;
+using CorpseLib.Scripts.Type;
 
 namespace CorpseLib.Scripts.Context
 {
     public class TypeDefinition
     {
-        internal abstract class AAttributeDefinition(TypeInfo typeInfo, int[] tags, int[] comments, int id, object[]? value)
+        internal abstract class AAttributeDefinition(TypeInfo typeInfo, int[] tags, int[] comments, int id, IMemoryValue? value)
         {
             private readonly TypeInfo m_TypeInfo = typeInfo;
             private readonly int[] m_Tags = tags;
             private readonly int[] m_Comments = comments;
             private readonly int m_ID = id;
-            private readonly object[]? m_Value = value;
+            private readonly IMemoryValue? m_Value = value;
 
             internal TypeInfo TypeInfo => m_TypeInfo;
-            internal object[]? Value => m_Value;
+            internal IMemoryValue? Value => m_Value;
             internal int ID => m_ID;
 
             public abstract Parameter? Instantiate(Dictionary<int, TypeInfo> templateTypeGiven, Environment env);
         }
 
-        internal class AttributeDefinition(TypeInfo typeInfo, int[] tags, int[] comments, int id, object[]? value) : AAttributeDefinition(typeInfo, tags, comments, id, value)
+        internal class AttributeDefinition(TypeInfo typeInfo, int[] tags, int[] comments, int id, IMemoryValue? value) : AAttributeDefinition(typeInfo, tags, comments, id, value)
         {
             public override Parameter? Instantiate(Dictionary<int, TypeInfo> templateTypeGiven, Environment env)
             {
@@ -35,7 +36,7 @@ namespace CorpseLib.Scripts.Context
             }
         }
 
-        internal class TemplateAttributeDefinition(TypeInfo typeInfo, int[] tags, int[] comments, int nameID, object[]? value) : AAttributeDefinition(typeInfo, tags, comments, nameID, value)
+        internal class TemplateAttributeDefinition(TypeInfo typeInfo, int[] tags, int[] comments, int nameID, IMemoryValue? value) : AAttributeDefinition(typeInfo, tags, comments, nameID, value)
         {
             private static TypeInfo ConvertTemplatedType(TypeInfo typeInfo, Dictionary<int, TypeInfo> templateTypeGiven)
             {
@@ -96,7 +97,7 @@ namespace CorpseLib.Scripts.Context
             return false;
         }
 
-        internal bool AddAttribute(TypeInfo typeInfo, int[] tags, int[] comments, int id, object[]? value)
+        internal bool AddAttribute(TypeInfo typeInfo, int[] tags, int[] comments, int id, IMemoryValue? value)
         {
             if (SearchAttribute(id))
                 return false;
@@ -104,7 +105,7 @@ namespace CorpseLib.Scripts.Context
             return true;
         }
 
-        internal bool AddTemplateAttribute(TypeInfo typeInfo, int[] tags, int[] comments, int id, object[]? value)
+        internal bool AddTemplateAttribute(TypeInfo typeInfo, int[] tags, int[] comments, int id, IMemoryValue? value)
         {
             if (SearchAttribute(id))
                 return false;

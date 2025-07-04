@@ -1,4 +1,5 @@
-﻿using System.Text;
+﻿using CorpseLib.Scripts.Memory;
+using System.Text;
 
 namespace CorpseLib.Scripts.Parser
 {
@@ -103,10 +104,10 @@ namespace CorpseLib.Scripts.Parser
             return new(str, string.Empty);
         }
 
-        public static object[] ParseValue(string str, ParsingContext parsingContext)
+        public static IMemoryValue ParseValue(string str, ParsingContext parsingContext)
         {
             if (str == "null")
-                return [];
+                return Heap.NULL;
             if (str.Length > 2 && str[0] == '{' && str[^1] == '}')
             {
                 str = str[1..^1];
@@ -114,7 +115,7 @@ namespace CorpseLib.Scripts.Parser
                     str = str[..^1];
                 if (str.Length > 0 && str[0] == ' ')
                     str = str[1..];
-                List<object[]> variables = [];
+                List<IMemoryValue> variables = [];
                 while (!string.IsNullOrEmpty(str))
                 {
                     if (str[0] == '[')
@@ -142,7 +143,7 @@ namespace CorpseLib.Scripts.Parser
                         str = split.Item2;
                     }
                 }
-                return [.. variables];
+                return new AnonymousObjectValue([.. variables]);
             }
             else if (str.Length > 2 && str[0] == '[' && str[^1] == ']')
             {
@@ -151,57 +152,56 @@ namespace CorpseLib.Scripts.Parser
                     str = str[..^1];
                 if (str.Length > 0 && str[0] == ' ')
                     str = str[1..];
-                if (str[0] == '[')
+                List<IMemoryValue> variables = [];
+                while (!string.IsNullOrEmpty(str))
                 {
-                    List<object[]> variables = [];
-                    while (!string.IsNullOrEmpty(str))
+                    if (str[0] == '[')
                     {
                         Tuple<string, string> split = NextElement(str, '[', ']');
                         variables.Add(ParseValue(split.Item1, parsingContext));
                         str = split.Item2;
                     }
-                    return [variables];
-                }
-                else if (str[0] == '{')
-                {
-                    List<object[]> variables = [];
-                    while (!string.IsNullOrEmpty(str))
+                    else if (str[0] == '{')
                     {
                         Tuple<string, string> split = NextElement(str, '{', '}');
                         variables.Add(ParseValue(split.Item1, parsingContext));
                         str = split.Item2;
                     }
-                    return [variables];
+                    else if (str[0] == '"')
+                    {
+                        Tuple<string, string> split = NextString(str);
+                        variables.Add(ParseValue(split.Item1, parsingContext));
+                        str = split.Item2;
+                    }
+                    else
+                    {
+                        Tuple<string, string> split = IsolateFirstElem(str);
+                        variables.Add(ParseValue(split.Item1, parsingContext));
+                        str = split.Item2;
+                    }
                 }
-                else
-                {
-                    List<object[]> variables = [];
-                    string[] elements = Shell.Helper.Split(str, ',');
-                    foreach (string element in elements)
-                        variables.Add(ParseValue(element, parsingContext));
-                    return [variables];
-                }
+                return new ArrayValue([.. variables]);
             }
             else if (str.Length > 2 && str[0] == '"' && str[^1] == '"')
-                return [str[1..^1]];
+                return new StringValue(str[1..^1]);
             else if (str.Length > 2 && str[0] == '\'' && str[^1] == '\'')
             {
                 if (str.Length == 3)
-                    return [str[1]];
+                    return new LiteralValue(str[1]);
                 else if (str.Length == 4 && str[1] == '\\')
-                    return [str[2]];
+                    return new LiteralValue(str[2]);
                 else
                 {
                     parsingContext.RegisterWarning("Wrong delimiter for string", $"String delimited with char delimiter : {str}");
-                    return [str[1..^1]];
+                    return new StringValue(str[1..^1]);
                 }
             }
             else
             {
                 if (str == "true")
-                    return [true];
+                    return new LiteralValue(true);
                 else if (str == "false")
-                    return [false];
+                    return new LiteralValue(false);
                 else if (str.Contains('.'))
                 {
                     if (str.Length > 2 && str[0] == '-' && str[1] == '.')
@@ -213,12 +213,12 @@ namespace CorpseLib.Scripts.Parser
                     if (double.TryParse(str, out double value))
                     {
                         if (value >= float.MinValue && value <= float.MaxValue)
-                            return [(float)value];
+                            return new LiteralValue((float)value);
                         else
-                            return [value];
+                            return new LiteralValue(value);
                     }
                     parsingContext.RegisterError("Invalid script", $"Cannot parse float value : {str}");
-                    return [];
+                    return Heap.NULL;
                 }
                 else
                 {
@@ -227,13 +227,13 @@ namespace CorpseLib.Scripts.Parser
                         if (long.TryParse(str, out long value))
                         {
                             if (value >= sbyte.MinValue && value <= sbyte.MaxValue)
-                                return [(sbyte)value];
+                                return new LiteralValue((sbyte)value);
                             else if (value >= short.MinValue && value <= short.MaxValue)
-                                return [(short)value];
+                                return new LiteralValue((short)value);
                             else if (value >= int.MinValue && value <= int.MaxValue)
-                                return [(int)value];
+                                return new LiteralValue((int)value);
                             else
-                                return [value];
+                                return new LiteralValue(value);
                         }
                     }
                     else
@@ -241,18 +241,18 @@ namespace CorpseLib.Scripts.Parser
                         if (ulong.TryParse(str, out ulong value))
                         {
                             if (value >= byte.MinValue && value <= byte.MaxValue)
-                                return [(byte)value];
+                                return new LiteralValue((byte)value);
                             else if (value >= ushort.MinValue && value <= ushort.MaxValue)
-                                return [(ushort)value];
+                                return new LiteralValue((ushort)value);
                             else if (value >= uint.MinValue && value <= uint.MaxValue)
-                                return [(uint)value];
+                                return new LiteralValue((uint)value);
                             else
-                                return [value];
+                                return new LiteralValue(value);
                         }
                     }
                 }
             }
-            return [str]; //We consider it a string not delimited as some split can remove " from strings
+            return new StringValue(str); //We consider it a string not delimited as some split can remove " from strings
         }
     }
 }

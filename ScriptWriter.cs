@@ -1,5 +1,6 @@
 ﻿using CorpseLib.Scripts.Context;
 using CorpseLib.Scripts.Instructions;
+using CorpseLib.Scripts.Memory;
 using CorpseLib.Scripts.Operations;
 using CorpseLib.Scripts.Type;
 using System.Text;
@@ -42,59 +43,59 @@ namespace CorpseLib.Scripts
                 sb.Append("[]");
         }
 
-        public static void AppendAnonymousValue(ScriptBuilder sb, object[]? value)
+        public static void AppendMemoryValue(ScriptBuilder sb, IMemoryValue value)
         {
             if (value == null)
                 return;
-            if (value.Length == 0)
+            if (value is NullValue)
             {
                 sb.Append("null");
                 return;
             }
-            else if (IsObject(value))
+            else if (value is IMemoryObject objValue)
             {
                 sb.Append('{');
-                for (int i = 0; i != value.Length; ++i)
+                IMemoryValue[] properties = objValue.Properties;
+                for (int i = 0; i != properties.Length; ++i)
                 {
-                    object[] var = (value[i] as object[])!;
+                    IMemoryValue var = properties[i];
                     if (i != 0)
                         sb.Append(',');
                     sb.Append(' ');
-                    AppendAnonymousValue(sb, var);
+                    AppendMemoryValue(sb, var);
                 }
-                if (value.Length != 0)
+                if (properties.Length != 0)
                     sb.Append(' ');
                 sb.Append('}');
             }
-            else if (value.Length == 1)
+            else if (value is ArrayValue arrValue)
             {
-                object tmp = value[0];
-                if (tmp is List<object[]> elements)
+                sb.Append('[');
+                for (int i = 0; i != arrValue.Length; ++i)
                 {
-                    sb.Append('[');
-                    for (int i = 0; i != elements.Count; ++i)
-                    {
-                        object[] var = elements[i]!;
-                        if (i != 0)
-                            sb.Append(',');
-                        sb.Append(' ');
-                        AppendAnonymousValue(sb, var);
-                    }
-                    if (value.Length != 0)
-                        sb.Append(' ');
-                    sb.Append(']');
+                    IMemoryValue var = arrValue[i];
+                    if (i != 0)
+                        sb.Append(',');
+                    sb.Append(' ');
+                    AppendMemoryValue(sb, var);
                 }
-                else if (tmp is string)
-                {
-                    sb.Append('"');
-                    sb.Append(tmp);
-                    sb.Append('"');
-                }
-                else if (tmp is bool && Helper.ChangeType(tmp, out bool b))
+                if (arrValue.Length != 0)
+                    sb.Append(' ');
+                sb.Append(']');
+            }
+            else if (value is StringValue strValue)
+            {
+                sb.Append('"');
+                sb.Append(strValue.Str);
+                sb.Append('"');
+            }
+            else if (value is LiteralValue literalValue)
+            {
+                object tmp = literalValue.Value;
+                if (tmp is bool b)
                     sb.Append(b ? "true" : "false");
-                //Using sbyte to implicitly convert string to char
-                else if (tmp is char && Helper.ChangeType(tmp, out sbyte sB))
-                    sb.Append((char)sB);
+                else if (tmp is char c)
+                    sb.Append(c);
                 else
                     sb.Append(tmp);
             }
@@ -109,10 +110,10 @@ namespace CorpseLib.Scripts
                 sb.Append('&');
             sb.Append(' ');
             sb.AppendID(parameter.ID);
-            if (parameter.DefaultValues != null)
+            if (parameter.DefaultValue != null)
             {
                 sb.Append(" = ");
-                AppendAnonymousValue(sb, parameter.DefaultValues);
+                AppendMemoryValue(sb, parameter.DefaultValue);
             }
         }
 
@@ -204,16 +205,6 @@ namespace CorpseLib.Scripts
                 sb.Append('&');
         }
 
-        private static bool IsObject(object[] value)
-        {
-            foreach (object obj in value)
-            {
-                if (obj is not object[])
-                    return false;
-            }
-            return true;
-        }
-
         public static void AppendTypeDefinition(ScriptBuilder sb, TypeDefinition typeDefinition)
         {
             sb.Append("struct ");
@@ -231,7 +222,7 @@ namespace CorpseLib.Scripts
                 if (attribute.Value != null)
                 {
                     sb.Append(" = ");
-                    AppendAnonymousValue(sb, attribute.Value);
+                    AppendMemoryValue(sb, attribute.Value);
                 }
                 sb.Append(';');
                 ++i;
@@ -323,7 +314,7 @@ namespace CorpseLib.Scripts
         {
             AOperationTreeNode[] children = node.Children;
             if (node is LiteralOperationNode literalOperation)
-                AppendAnonymousValue(sb, literalOperation.Value);
+                AppendMemoryValue(sb, literalOperation.Value);
             else if (node is VariableOperationNode variableOperation)
             {
 

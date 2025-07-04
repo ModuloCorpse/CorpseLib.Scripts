@@ -1,4 +1,5 @@
 ﻿using CorpseLib.Scripts.Instructions;
+using CorpseLib.Scripts.Memory;
 using CorpseLib.Scripts.Operations;
 using CorpseLib.Scripts.Parser.Instruction.Expressions;
 
@@ -38,14 +39,14 @@ namespace CorpseLib.Scripts.Parser.Instruction
             return new(left);
         }
 
-        private static object[] ConvertAnonymousObject(AExpression expression)
+        private static IMemoryValue ConvertAnonymousObject(AExpression expression)
         {
             if (expression is AnonymousObjectExpression anonymousObject)
             {
-                List<object[]> values = [];
+                List<IMemoryValue> values = [];
                 foreach (AExpression parameter in anonymousObject.Parameters)
                     values.Add(ConvertAnonymousObject(parameter));
-                return anonymousObject.IsArray ? [values] : [..values];
+                return anonymousObject.IsArray ? new ArrayValue([..values]) : new AnonymousObjectValue([..values]);
             }
             return (expression as LiteralExpression)!.Value;
         }
@@ -89,15 +90,15 @@ namespace CorpseLib.Scripts.Parser.Instruction
                 if (!operandResult)
                     return operandResult;
                 AExpression operand = operandResult.Result!;
-                if (isNegative && operand is LiteralExpression literal && literal.Value.Length == 1 && literal.Value[0] is not string)
+                if (isNegative && operand is LiteralExpression literal && literal.Value is LiteralValue)
                     return new(operand);
                 return new(new UnaryExpression(op, operand));
             }
-            else if (tokens.Current?.Token == "{")
+            else if (currentToken.Token == "{")
             {
                 tokens.Pop();
                 List<AExpression> parameters = [];
-                if (tokens.Current.Token != "}")
+                if (tokens.Current?.Token != "}")
                 {
                     OperationResult<AExpression> parameterResult = ParseExpression(tokens, parsingContext);
                     if (!parameterResult)
@@ -120,11 +121,11 @@ namespace CorpseLib.Scripts.Parser.Instruction
                 tokens.Pop();
                 return new(new AnonymousObjectExpression(parameters, false));
             }
-            else if (tokens.Current?.Token == "[")
+            else if (currentToken.Token == "[")
             {
                 tokens.Pop();
                 List<AExpression> parameters = [];
-                if (tokens.Current.Token != "]")
+                if (tokens.Current?.Token != "]")
                 {
                     OperationResult<AExpression> parameterResult = ParseExpression(tokens, parsingContext);
                     if (!parameterResult)
@@ -166,10 +167,10 @@ namespace CorpseLib.Scripts.Parser.Instruction
             }
             else if (currentToken.IsIdentifier)
             {
-                int nameID = parsingContext.ConversionTable.PushName(tokens.Current!.Token);
+                string name = currentToken.Token;
                 tokens.Pop();
                 if (!tokens.HasNext)
-                    return new(new VariableExpression(nameID));
+                    return new(new VariableExpression(parsingContext.ConversionTable.PushName(name)));
 
                 if (tokens.Current?.Token == "(")
                 {
@@ -196,10 +197,17 @@ namespace CorpseLib.Scripts.Parser.Instruction
                     if (tokens.Current?.Token != ")")
                         return new("Error while parsing instruction", $"Expected ')' but found '{tokens.Current}'");
                     tokens.Pop();
-                    //TODO
-                    return new(new FunctionCallExpression([nameID], args));
+
+                    if (name == "length" && args.Count == 1)
+                        return new(new LengthExpression(args[0]));
+
+                    string[] namespaces = name.Split("::");
+                    int[] nameIDs = new int[namespaces.Length];
+                    for (int i = 0; i < namespaces.Length; i++)
+                        nameIDs[i] = parsingContext.ConversionTable.PushName(namespaces[i]);
+                    return new(new FunctionCallExpression(nameIDs, args));
                 }
-                return new(new VariableExpression(nameID));
+                return new(new VariableExpression(parsingContext.ConversionTable.PushName(name)));
             }
             return new("Error while parsing instruction", $"Unexpected token: {tokens.Current}");
         }

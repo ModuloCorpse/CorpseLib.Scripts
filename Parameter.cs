@@ -1,16 +1,17 @@
-﻿namespace CorpseLib.Scripts
+﻿using CorpseLib.Scripts.Memory;
+
+namespace CorpseLib.Scripts
 {
-    public class Parameter(ParameterType type, int id, object[]? defaultValue)
+    public class Parameter(ParameterType type, int id, IMemoryValue? defaultValue)
     {
         private readonly ParameterType m_Type = type;
         private readonly int m_ID = id;
-        private readonly object[]? m_DefaultValue = defaultValue;
+        private readonly IMemoryValue? m_DefaultValue = defaultValue;
 
         public ParameterType Type => m_Type;
         public int TypeID => m_Type.TypeID;
         public int ID => m_ID;
-        public object[]? DefaultValues => m_DefaultValue;
-        public object? DefaultValue => (m_DefaultValue != null && m_DefaultValue.Length == 1) ? m_DefaultValue[0] : null;
+        public IMemoryValue? DefaultValue => m_DefaultValue;
         public bool HaveDefaultValue => m_DefaultValue != null;
         public int ArrayCount => m_Type.ArrayCount;
         public bool IsStatic => m_Type.IsStatic;

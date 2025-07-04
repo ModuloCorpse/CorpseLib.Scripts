@@ -165,7 +165,7 @@ namespace CorpseLib.Scripts.Parser
                         parsingContext.RegisterWarning("Const without reference in function signature", $"Const parameter has been optimized with a reference in {functionName}");
                     }
                     if (isOptimized)
-                        parameters.Add(new Parameter(new ParameterType(result.TypeID, false, isConst, isRef, result.ArrayCount), result.ID, result.DefaultValues));
+                        parameters.Add(new Parameter(new ParameterType(result.TypeID, false, isConst, isRef, result.ArrayCount), result.ID, result.DefaultValue));
                     else
                         parameters.Add(result);
                 }

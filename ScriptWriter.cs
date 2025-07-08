@@ -1,6 +1,6 @@
 ﻿using CorpseLib.Scripts.Context;
 using CorpseLib.Scripts.Instructions;
-using CorpseLib.Scripts.Memory;
+using CorpseLib.Scripts.Memories;
 using CorpseLib.Scripts.Operations;
 using CorpseLib.Scripts.Type;
 using System.Text;

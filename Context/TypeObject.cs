@@ -1,5 +1,4 @@
-﻿using CorpseLib.Scripts.Type;
-using System.Diagnostics.CodeAnalysis;
+﻿using System.Diagnostics.CodeAnalysis;
 
 namespace CorpseLib.Scripts.Context
 {

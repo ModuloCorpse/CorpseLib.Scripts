@@ -1,4 +1,4 @@
-﻿using CorpseLib.Scripts.Context;
+﻿using CorpseLib.Scripts.Memories;
 using Environment = CorpseLib.Scripts.Context.Environment;
 
 namespace CorpseLib.Scripts
@@ -11,7 +11,8 @@ namespace CorpseLib.Scripts
 
         internal object? Call(Environment env, object?[] parameters)
         {
-            FunctionStack stack = new();
+            //TODO
+            Memory memory = new();
             /*int i = 0;
             while (i != m_Signature.Parameters.Length)
             {
@@ -29,9 +30,9 @@ namespace CorpseLib.Scripts
             {
                 return null;
             }*/
-            return InternalExecute(env, stack);
+            return InternalExecute(env, memory);
         }
 
-        internal abstract object? InternalExecute(Environment env, FunctionStack stack);
+        internal abstract object? InternalExecute(Environment env, Memory memory);
     }
 }

@@ -1,5 +1,4 @@
-﻿using CorpseLib.Scripts.Context;
-using CorpseLib.Scripts.Memory;
+﻿using CorpseLib.Scripts.Memories;
 using CorpseLib.Scripts.Parser;
 using Environment = CorpseLib.Scripts.Context.Environment;
 
@@ -25,7 +24,7 @@ namespace CorpseLib.Scripts.Operations
 
         protected abstract bool IsValid(ParsingContext parsingContext, string instructionStr);
 
-        internal IMemoryValue CallOperation(Environment env, FunctionStack functionStack) => Execute(env, functionStack);
-        protected abstract IMemoryValue Execute(Environment env, FunctionStack functionStack);
+        internal IMemoryValue CallOperation(Environment env, Memory memory) => Execute(env, memory);
+        protected abstract IMemoryValue Execute(Environment env, Memory memory);
     }
 }

@@ -1,6 +1,6 @@
 ﻿using System.Collections;
 
-namespace CorpseLib.Scripts.Memory
+namespace CorpseLib.Scripts.Memories
 {
     public class Heap : IEnumerable<KeyValuePair<int, IMemoryValue>>
     {

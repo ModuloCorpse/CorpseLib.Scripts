@@ -1,5 +1,4 @@
-﻿using CorpseLib.Scripts.Context;
-using CorpseLib.Scripts.Memory;
+﻿using CorpseLib.Scripts.Memories;
 using CorpseLib.Scripts.Parser;
 using Environment = CorpseLib.Scripts.Context.Environment;
 
@@ -13,7 +12,7 @@ namespace CorpseLib.Scripts.Operations
 
         internal override bool IsBooleanOperation => m_Value is LiteralValue literalValue && literalValue.Value is bool;
 
-        protected override IMemoryValue Execute(Environment env, FunctionStack functionStack) => m_Value;
+        protected override IMemoryValue Execute(Environment env, Memory memory) => m_Value;
         protected override bool IsValid(ParsingContext _, string instructionStr) => true;
     }
 }

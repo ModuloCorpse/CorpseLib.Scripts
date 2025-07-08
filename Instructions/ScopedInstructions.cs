@@ -1,4 +1,4 @@
-﻿using CorpseLib.Scripts.Context;
+﻿using CorpseLib.Scripts.Memories;
 using Environment = CorpseLib.Scripts.Context.Environment;
 
 namespace CorpseLib.Scripts.Instructions
@@ -25,32 +25,32 @@ namespace CorpseLib.Scripts.Instructions
         public void AddInstruction(AInstruction instruction) => m_Instructions.Add(instruction);
         public void AddInstructions(IEnumerable<AInstruction> instructions) => m_Instructions.AddRange(instructions);
 
-        public EExecutionResult Execute(Environment env, FunctionStack functionStack)
+        public EExecutionResult Execute(Environment env, Memory memory)
         {
-            functionStack.OpenScope();
+            memory.OpenScope();
             foreach (AInstruction instruction in m_Instructions)
             {
                 if (instruction is Break)
                 {
-                    functionStack.CloseScope();
+                    memory.CloseScope();
                     return EExecutionResult.Breaked;
                 }
                 else if (instruction is Continue)
                 {
-                    functionStack.CloseScope();
+                    memory.CloseScope();
                     return EExecutionResult.Continued;
                 }
                 else
                 {
-                    instruction.ExecuteInstruction(env, functionStack);
-                    if (functionStack.HasReturn)
+                    instruction.ExecuteInstruction(env, memory);
+                    if (memory.HasReturn)
                     {
-                        functionStack.CloseScope();
+                        memory.CloseScope();
                         return EExecutionResult.Returned;
                     }
                 }
             }
-            functionStack.CloseScope();
+            memory.CloseScope();
             return EExecutionResult.None;
         }
     }

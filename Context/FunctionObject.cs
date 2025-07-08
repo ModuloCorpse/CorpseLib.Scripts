@@ -1,10 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-
-namespace CorpseLib.Scripts.Context
+﻿namespace CorpseLib.Scripts.Context
 {
     public class FunctionObject(AFunction function, int[] tags, int[] comments) : EnvironmentObject(function.Signature.ID, tags, comments)
     {

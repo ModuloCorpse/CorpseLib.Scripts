@@ -1,7 +1,7 @@
 ﻿using CorpseLib.Scripts.Type;
 using Environment = CorpseLib.Scripts.Context.Environment;
 
-namespace CorpseLib.Scripts.Memory
+namespace CorpseLib.Scripts.Memories
 {
     public class AnonymousObjectValue(IMemoryValue[] value) : IMemoryObject
     {

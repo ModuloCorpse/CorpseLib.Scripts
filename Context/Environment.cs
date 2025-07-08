@@ -6,7 +6,6 @@ namespace CorpseLib.Scripts.Context
     public class Environment
     {
         private readonly EnvironmentObjectDictionary m_Objects = new();
-        private readonly Dictionary<int, Variable> m_Globals = [];
         private readonly List<ATypeInstance> m_TypeTable = [..Types.PRIMITIVE_TYPES];
 
         public EnvironmentObjectDictionary Objects => m_Objects;

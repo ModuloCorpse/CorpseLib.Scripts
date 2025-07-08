@@ -1,4 +1,4 @@
-﻿using CorpseLib.Scripts.Memory;
+﻿using CorpseLib.Scripts.Memories;
 using CorpseLib.Scripts.Type;
 
 namespace CorpseLib.Scripts.Context

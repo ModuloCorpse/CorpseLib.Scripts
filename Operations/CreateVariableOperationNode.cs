@@ -1,17 +1,15 @@
-﻿using CorpseLib.Scripts.Context;
-using CorpseLib.Scripts.Memory;
+﻿using CorpseLib.Scripts.Memories;
 using CorpseLib.Scripts.Parser;
-using CorpseLib.Scripts.Type;
 using Environment = CorpseLib.Scripts.Context.Environment;
 
 namespace CorpseLib.Scripts.Operations
 {
-    public class CreateVariableOperationNode(ATypeInstance variableType, int variableID) : AOperationTreeNode
+    public class CreateVariableOperationNode(int variableTypeID, int variableID) : AOperationTreeNode
     {
-        private readonly ATypeInstance m_VariableType = variableType;
+        private readonly int m_VariableTypeID = variableTypeID;
         private readonly int m_VariableID = variableID;
 
-        protected override IMemoryValue Execute(Environment env, FunctionStack functionStack)
+        protected override IMemoryValue Execute(Environment env, Memory memory)
         {
             throw new NotImplementedException();
         }

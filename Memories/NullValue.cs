@@ -1,4 +1,4 @@
-﻿namespace CorpseLib.Scripts.Memory
+﻿namespace CorpseLib.Scripts.Memories
 {
     public class NullValue : IMemoryValue
     {

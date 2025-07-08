@@ -1,4 +1,4 @@
-﻿using CorpseLib.Scripts.Context;
+﻿using CorpseLib.Scripts.Memories;
 using Environment = CorpseLib.Scripts.Context.Environment;
 
 namespace CorpseLib.Scripts.Instructions
@@ -13,13 +13,13 @@ namespace CorpseLib.Scripts.Instructions
         internal void AddElif(Condition condition, List<AInstruction> body) => m_Elifs.Add(new(condition, body));
         internal void SetElseBody(List<AInstruction> body) => m_ElseBody.AddInstructions(body);
 
-        private ScopedInstructions GetInstructions(Environment env, FunctionStack functionStack)
+        private ScopedInstructions GetInstructions(Environment env, Memory memory)
         {
-            if (EvaluateCondition(env, functionStack))
+            if (EvaluateCondition(env, memory))
                 return Body;
             foreach (var elif in m_Elifs)
             {
-                if (elif.EvaluateCondition(env, functionStack))
+                if (elif.EvaluateCondition(env, memory))
                     return elif.Body;
             }
             if (!m_ElseBody.IsEmpty)
@@ -27,12 +27,12 @@ namespace CorpseLib.Scripts.Instructions
             return new();
         }
 
-        protected override void Execute(Environment env, FunctionStack functionStack)
+        protected override void Execute(Environment env, Memory memory)
         {
-            ScopedInstructions instructions = GetInstructions(env, functionStack);
+            ScopedInstructions instructions = GetInstructions(env, memory);
             if (instructions.IsEmpty)
                 return;
-            _ = instructions.Execute(env, functionStack);
+            _ = instructions.Execute(env, memory);
         }
     }
 }

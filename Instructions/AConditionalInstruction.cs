@@ -1,4 +1,4 @@
-﻿using CorpseLib.Scripts.Context;
+﻿using CorpseLib.Scripts.Memories;
 using Environment = CorpseLib.Scripts.Context.Environment;
 
 namespace CorpseLib.Scripts.Instructions
@@ -11,7 +11,7 @@ namespace CorpseLib.Scripts.Instructions
         public ScopedInstructions Body => m_Body;
         public Condition Condition => m_Condition;
 
-        protected bool EvaluateCondition(Environment env, FunctionStack functionStack)
+        protected bool EvaluateCondition(Environment env, Memory memory)
         {
             return false;
         }

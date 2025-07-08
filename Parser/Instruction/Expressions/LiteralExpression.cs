@@ -1,4 +1,4 @@
-﻿using CorpseLib.Scripts.Memory;
+﻿using CorpseLib.Scripts.Memories;
 
 namespace CorpseLib.Scripts.Parser.Instruction.Expressions
 {

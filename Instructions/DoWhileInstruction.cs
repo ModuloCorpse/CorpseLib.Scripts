@@ -1,15 +1,15 @@
-﻿using CorpseLib.Scripts.Context;
+﻿using CorpseLib.Scripts.Memories;
 using Environment = CorpseLib.Scripts.Context.Environment;
 
 namespace CorpseLib.Scripts.Instructions
 {
     public class DoWhileInstruction(Condition condition, List<AInstruction> body) : AConditionalInstruction(condition, body)
     {
-        protected override void Execute(Environment env, FunctionStack functionStack)
+        protected override void Execute(Environment env, Memory memory)
         {
             do
             {
-                ScopedInstructions.EExecutionResult result = Body.Execute(env, functionStack);
+                ScopedInstructions.EExecutionResult result = Body.Execute(env, memory);
                 switch (result)
                 {
                     case ScopedInstructions.EExecutionResult.Breaked:
@@ -19,7 +19,7 @@ namespace CorpseLib.Scripts.Instructions
                     case ScopedInstructions.EExecutionResult.Continued:
                         break; // Continue to the next iteration
                 }
-            } while (EvaluateCondition(env, functionStack));
+            } while (EvaluateCondition(env, memory));
         }
     }
 }

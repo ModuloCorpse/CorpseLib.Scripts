@@ -1,4 +1,4 @@
-﻿using CorpseLib.Scripts.Context;
+﻿using CorpseLib.Scripts.Memories;
 using CorpseLib.Scripts.Operations;
 using Environment = CorpseLib.Scripts.Context.Environment;
 
@@ -10,12 +10,12 @@ namespace CorpseLib.Scripts.Instructions
 
         internal AOperationTreeNode? Operations => m_Operations;
 
-        protected override void Execute(Environment env, FunctionStack instructionStack)
+        protected override void Execute(Environment env, Memory memory)
         {
             if (m_Operations == null)
-                instructionStack.Return();
+                memory.Return();
             else
-                instructionStack.Return(m_Operations.CallOperation(env, instructionStack));
+                memory.Return(m_Operations.CallOperation(env, memory));
         }
     }
 }

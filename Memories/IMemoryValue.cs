@@ -4,7 +4,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace CorpseLib.Scripts.Memory
+namespace CorpseLib.Scripts.Memories
 {
     public interface IMemoryValue
     {

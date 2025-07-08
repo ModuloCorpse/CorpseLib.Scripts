@@ -2,7 +2,7 @@
 using CorpseLib.Scripts.Type;
 using static CorpseLib.Scripts.Parser.CommentAndTagParser;
 using System.Text;
-using CorpseLib.Scripts.Memory;
+using CorpseLib.Scripts.Memories;
 
 namespace CorpseLib.Scripts.Parser
 {

@@ -2,6 +2,7 @@
 using CorpseLib.Scripts.Instructions;
 using CorpseLib.Scripts.Memories;
 using CorpseLib.Scripts.Operations;
+using CorpseLib.Scripts.Parameters;
 using CorpseLib.Scripts.Type;
 using System.Text;
 using static CorpseLib.Scripts.Context.TypeDefinition;
@@ -43,53 +44,117 @@ namespace CorpseLib.Scripts
                 sb.Append("[]");
         }
 
-        public static void AppendMemoryValue(ScriptBuilder sb, IMemoryValue value)
+        public static void AppendMemoryValue(ScriptBuilder sb, Memory memory, AMemoryValue value)
         {
             if (value == null)
                 return;
-            if (value is NullValue)
+            if (value is MemoryNullValue)
             {
                 sb.Append("null");
                 return;
             }
-            else if (value is IMemoryObject objValue)
+            else if (value is MemoryObjectValue objValue)
             {
                 sb.Append('{');
-                IMemoryValue[] properties = objValue.Properties;
+                int[] properties = objValue.Properties;
                 for (int i = 0; i != properties.Length; ++i)
                 {
-                    IMemoryValue var = properties[i];
+                    AMemoryValue? var = memory.GetMemoryValue(properties[i]);
                     if (i != 0)
                         sb.Append(',');
                     sb.Append(' ');
-                    AppendMemoryValue(sb, var);
+                    if (var != null)
+                        AppendMemoryValue(sb, memory, var);
+                    else
+                        sb.Append("Error null memory value");
                 }
                 if (properties.Length != 0)
                     sb.Append(' ');
                 sb.Append('}');
             }
-            else if (value is ArrayValue arrValue)
+            else if (value is MemoryArrayValue arrValue)
             {
                 sb.Append('[');
                 for (int i = 0; i != arrValue.Length; ++i)
                 {
-                    IMemoryValue var = arrValue[i];
+                    AMemoryValue? var = memory.GetMemoryValue(arrValue[i]);
                     if (i != 0)
                         sb.Append(',');
                     sb.Append(' ');
-                    AppendMemoryValue(sb, var);
+                    if (var != null)
+                        AppendMemoryValue(sb, memory, var);
+                    else
+                        sb.Append("Error null memory value");
                 }
                 if (arrValue.Length != 0)
                     sb.Append(' ');
                 sb.Append(']');
             }
-            else if (value is StringValue strValue)
+            else if (value is MemoryStringValue strValue)
             {
                 sb.Append('"');
                 sb.Append(strValue.Str);
                 sb.Append('"');
             }
-            else if (value is LiteralValue literalValue)
+            else if (value is MemoryLiteralValue literalValue)
+            {
+                object tmp = literalValue.Value;
+                if (tmp is bool b)
+                    sb.Append(b ? "true" : "false");
+                else if (tmp is char c)
+                    sb.Append(c);
+                else
+                    sb.Append(tmp);
+            }
+        }
+
+        public static void AppendParameterValue(ScriptBuilder sb, ITemporaryValue value)
+        {
+            if (value == null)
+                return;
+            if (value is TemporaryNullValue)
+            {
+                sb.Append("null");
+                return;
+            }
+            else if (value is TemporaryObjectValue objValue)
+            {
+                sb.Append('{');
+                ITemporaryValue[] properties = objValue.Properties;
+                for (int i = 0; i != properties.Length; ++i)
+                {
+                    ITemporaryValue var = properties[i];
+                    if (i != 0)
+                        sb.Append(',');
+                    sb.Append(' ');
+                    AppendParameterValue(sb, var);
+                }
+                if (properties.Length != 0)
+                    sb.Append(' ');
+                sb.Append('}');
+            }
+            else if (value is TemporaryArrayValue arrValue)
+            {
+                sb.Append('[');
+                for (int i = 0; i != arrValue.Length; ++i)
+                {
+                    ITemporaryValue var = arrValue[i];
+                    if (i != 0)
+                        sb.Append(',');
+                    sb.Append(' ');
+                    AppendParameterValue(sb, var);
+                }
+                if (arrValue.Length != 0)
+                    sb.Append(' ');
+                sb.Append(']');
+            }
+            else if (value is TemporaryStringValue strValue)
+            {
+                sb.Append('"');
+                sb.Append(strValue.Str);
+                sb.Append('"');
+            }
+            else if (value is TemporaryLiteralValue literalValue)
             {
                 object tmp = literalValue.Value;
                 if (tmp is bool b)
@@ -113,7 +178,7 @@ namespace CorpseLib.Scripts
             if (parameter.DefaultValue != null)
             {
                 sb.Append(" = ");
-                AppendMemoryValue(sb, parameter.DefaultValue);
+                AppendParameterValue(sb, parameter.DefaultValue);
             }
         }
 
@@ -222,7 +287,7 @@ namespace CorpseLib.Scripts
                 if (attribute.Value != null)
                 {
                     sb.Append(" = ");
-                    AppendMemoryValue(sb, attribute.Value);
+                    AppendParameterValue(sb, attribute.Value);
                 }
                 sb.Append(';');
                 ++i;
@@ -313,21 +378,11 @@ namespace CorpseLib.Scripts
         private static void AppendOperationTreeNode(ScriptBuilder sb, AOperationTreeNode node)
         {
             AOperationTreeNode[] children = node.Children;
-            if (node is LiteralOperationNode literalOperation)
-                AppendMemoryValue(sb, literalOperation.Value);
-            else if (node is VariableOperationNode variableOperation)
-            {
-
-            }
-            else if (node is CreateVariableOperationNode createVariableOperation)
-            {
-
-            }
-            else if (node is EqualityOperationNode equalityOperationNode)
+            if (node is EqualityOperationNode equalityOperationNode)
                 AppendBinaryOperationTreeNode(sb, children, equalityOperationNode.IsNot ? "!=" : "==");
-            else if (node is AndOperationNode andOperationNode)
+            else if (node is AndOperationNode)
                 AppendBinaryOperationTreeNode(sb, children, "&&");
-            else if (node is OrOperationNode orOperationNode)
+            else if (node is OrOperationNode)
                 AppendBinaryOperationTreeNode(sb, children, "||");
         }
 

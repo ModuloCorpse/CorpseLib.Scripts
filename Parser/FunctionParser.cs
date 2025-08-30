@@ -1,4 +1,5 @@
 ﻿using CorpseLib.Scripts.Instructions;
+using CorpseLib.Scripts.Parameters;
 using CorpseLib.Scripts.Parser.Instruction;
 using CorpseLib.Scripts.Type;
 using System.Text;
@@ -412,11 +413,13 @@ namespace CorpseLib.Scripts.Parser
             }
             str = scoped.Item3;
             Function function = new(functionSignature);
-            //TODO
-            List<AInstruction> functionBody = FunctionLoadBody($"Invalid function {functionSignatureName}", scoped.Item2, parsingContext);
-            if (parsingContext.HasErrors)
-                return;
-            function.AddInstructions(functionBody);
+            //TODO Parse later
+            {
+                List<AInstruction> functionBody = FunctionLoadBody($"Invalid function {functionSignatureName}", scoped.Item2, parsingContext);
+                if (parsingContext.HasErrors)
+                    return;
+                function.AddInstructions(functionBody);
+            }
             if (!parsingContext.PushFunction(function, commentAndTags.Tags, commentAndTags.CommentIDs))
             {
                 parsingContext.RegisterError("Invalid script", $"Function {functionSignatureName} already exist");

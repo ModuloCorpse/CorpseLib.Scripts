@@ -1,46 +1,46 @@
-﻿using System.Collections;
+﻿using CorpseLib.Scripts.Parameters;
+using System.Collections;
 
 namespace CorpseLib.Scripts.Memories
 {
-    public class Memory : IEnumerable<KeyValuePair<int, IMemoryValue>>, IEnumerable<StackVariable>
+    public class Memory : IEnumerable<Heap.MemorySlot>, IEnumerable<StackVariable>
     {
         private readonly Heap m_Heap = new();
         private readonly Stack m_Stack = new();
 
-        public void AddVariable(int id, ParameterType type, IMemoryValue value)
+        internal Heap Heap => m_Heap;
+
+        public void AddVariable(int id, ParameterType type, AMemoryValue value)
         {
-            int memoryAddress = m_Heap.Allocate(value);
-            StackVariable stackVariable = new(type, memoryAddress, false);
-            m_Stack.AddVariable(id, stackVariable);
+            if (type.IsRef || value.Address == -1)
+                m_Stack.AddVariable(id, new(type, m_Heap.Allocate(value), false));
+            else
+                m_Stack.AddVariable(id, new(type, m_Heap.Duplicate(value.Address), false));
         }
 
-        public bool PassByCopy(int from, int to)
-        {
-            StackVariable? fromStackVariable = m_Stack.GetPreviousVariable(from);
-            if (fromStackVariable == null)
-                return false;
-            int copyAddress = m_Heap.Duplicate(fromStackVariable.MemoryAddress);
-            StackVariable toStackVariable = new(fromStackVariable.Type, copyAddress, false);
-            m_Stack.AddVariable(to, toStackVariable);
-            return true;
-        }
+        public AMemoryValue? GetMemoryValue(int address) => m_Heap.Get(address);
 
-        public bool PassByReference(int from, int to)
-        {
-            StackVariable? fromStackVariable = m_Stack.GetPreviousVariable(from);
-            if (fromStackVariable == null)
-                return false;
-            StackVariable toStackVariable = new(fromStackVariable.Type, fromStackVariable.MemoryAddress, true);
-            m_Stack.AddVariable(to, toStackVariable);
-            return true;
-        }
-
-        public IMemoryValue? GetVariable(int id)
+        public AMemoryValue? GetVariable(int id)
         {
             StackVariable? stackVariable = m_Stack.GetVariable(id);
             if (stackVariable == null)
                 return null;
-            return m_Heap.Get(stackVariable.MemoryAddress);
+            return GetMemoryValue(stackVariable.MemoryAddress);
+        }
+
+        public void SetVariable(int id, AMemoryValue value)
+        {
+            StackVariable? stackVariable = m_Stack.GetVariable(id);
+            if (stackVariable == null)
+                return;
+            int address = m_Heap.Allocate(value);
+            if (stackVariable.IsRef)
+                stackVariable.MemoryAddress = address;
+            else
+            {
+                int newAddress = m_Heap.Duplicate(address);
+                stackVariable.MemoryAddress = newAddress;
+            }
         }
 
         public void OpenScope() => m_Stack.OpenScope();
@@ -49,10 +49,7 @@ namespace CorpseLib.Scripts.Memories
         {
             List<StackVariable> toFree = m_Stack.CloseScope();
             foreach (StackVariable variable in toFree)
-            {
-                if (!variable.IsRef)
-                    m_Heap.Free(variable.MemoryAddress);
-            }
+                m_Heap.Free(variable.MemoryAddress);
         }
 
         public void PushFunction() => m_Stack.PushFunction();
@@ -61,19 +58,16 @@ namespace CorpseLib.Scripts.Memories
         {
             List<StackVariable> toFree = m_Stack.PopFunction();
             foreach (StackVariable variable in toFree)
-            {
-                if (!variable.IsRef)
-                    m_Heap.Free(variable.MemoryAddress);
-            }
+                m_Heap.Free(variable.MemoryAddress);
         }
 
-        public IMemoryValue? ReturnValue => m_Stack.ReturnValue;
+        public AMemoryValue? ReturnValue => m_Stack.ReturnValue;
         public bool HasReturn => m_Stack.HasReturn;
 
         public void Return() => m_Stack.Return();
-        public void Return(IMemoryValue value) => m_Stack.Return(value);
+        public void Return(AMemoryValue value) => m_Stack.Return(value);
 
-        IEnumerator<KeyValuePair<int, IMemoryValue>> IEnumerable<KeyValuePair<int, IMemoryValue>>.GetEnumerator() => ((IEnumerable<KeyValuePair<int, IMemoryValue>>)m_Heap).GetEnumerator();
+        IEnumerator<Heap.MemorySlot> IEnumerable<Heap.MemorySlot>.GetEnumerator() => ((IEnumerable<Heap.MemorySlot>)m_Heap).GetEnumerator();
         IEnumerator<StackVariable> IEnumerable<StackVariable>.GetEnumerator() => ((IEnumerable<StackVariable>)m_Stack).GetEnumerator();
         IEnumerator IEnumerable.GetEnumerator() => ((IEnumerable)m_Heap).GetEnumerator();
     }

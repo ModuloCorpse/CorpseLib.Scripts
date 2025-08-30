@@ -12,6 +12,8 @@ namespace CorpseLib.Scripts.Operations
 
         internal virtual bool IsBooleanOperation => false;
 
+        internal void AddChild(AOperationTreeNode child) => m_Children.Add(child);
+
         internal bool Validate(ParsingContext parsingContext, string instructionStr)
         {
             foreach (AOperationTreeNode child in m_Children)
@@ -24,7 +26,7 @@ namespace CorpseLib.Scripts.Operations
 
         protected abstract bool IsValid(ParsingContext parsingContext, string instructionStr);
 
-        internal IMemoryValue CallOperation(Environment env, Memory memory) => Execute(env, memory);
-        protected abstract IMemoryValue Execute(Environment env, Memory memory);
+        internal AMemoryValue CallOperation(Environment env, Memory memory) => Execute(env, memory);
+        protected abstract AMemoryValue Execute(Environment env, Memory memory);
     }
 }

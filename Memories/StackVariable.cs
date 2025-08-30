@@ -1,4 +1,6 @@
-﻿namespace CorpseLib.Scripts.Memories
+﻿using CorpseLib.Scripts.Parameters;
+
+namespace CorpseLib.Scripts.Memories
 {
     public class StackVariable(ParameterType type, int memoryAdress, bool isRef)
     {

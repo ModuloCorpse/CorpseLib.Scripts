@@ -12,13 +12,13 @@ namespace CorpseLib.Scripts.Operations
 
         internal override bool IsBooleanOperation => true;
 
-        protected override IMemoryValue Execute(Environment env, Memory memory)
+        protected override AMemoryValue Execute(Environment env, Memory memory)
         {
-            IMemoryValue leftValue = m_Children[0].CallOperation(env, memory);
-            IMemoryValue rightValue = m_Children[1].CallOperation(env, memory);
+            AMemoryValue leftValue = m_Children[0].CallOperation(env, memory);
+            AMemoryValue rightValue = m_Children[1].CallOperation(env, memory);
             if (m_IsNot)
-                return new LiteralValue(!leftValue.Equals(rightValue));
-            return new LiteralValue(leftValue.Equals(rightValue));
+                return new MemoryLiteralValue(!leftValue.Equals(rightValue));
+            return new MemoryLiteralValue(leftValue.Equals(rightValue));
         }
 
         protected override bool IsValid(ParsingContext _, string instructionStr) => true;

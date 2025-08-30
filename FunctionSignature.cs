@@ -1,4 +1,6 @@
-﻿namespace CorpseLib.Scripts
+﻿using CorpseLib.Scripts.Parameters;
+
+namespace CorpseLib.Scripts
 {
     public class FunctionSignature(ParameterType returnType, int id, Parameter[] parameters)
     {

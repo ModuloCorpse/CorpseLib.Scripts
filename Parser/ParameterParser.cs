@@ -1,4 +1,5 @@
 ﻿using CorpseLib.Scripts.Memories;
+using CorpseLib.Scripts.Parameters;
 
 namespace CorpseLib.Scripts.Parser
 {
@@ -85,7 +86,7 @@ namespace CorpseLib.Scripts.Parser
                 parsingContext.RegisterError("Invalid script", "Parameter type cannot be void");
                 return null;
             }
-            IMemoryValue? value = null;
+            ITemporaryValue? value = null;
             if (parameterParts.Length == 3)
                 value = ValueParser.ParseValue(parameterParts[2], parsingContext);
             if (value != null)

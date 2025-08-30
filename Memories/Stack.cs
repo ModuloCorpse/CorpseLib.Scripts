@@ -7,7 +7,7 @@ namespace CorpseLib.Scripts.Memories
         private readonly List<FunctionStack> m_FunctionsStack = [];
         private readonly Dictionary<int, StackVariable> m_Variables = [];
 
-        public IMemoryValue? ReturnValue => (m_FunctionsStack.Count > 0) ? m_FunctionsStack[^1].ReturnValue : null;
+        public AMemoryValue? ReturnValue => (m_FunctionsStack.Count > 0) ? m_FunctionsStack[^1].ReturnValue : null;
         public bool HasReturn => (m_FunctionsStack.Count > 0) && m_FunctionsStack[^1].HasReturn;
 
         public void Return()
@@ -16,7 +16,7 @@ namespace CorpseLib.Scripts.Memories
                 m_FunctionsStack[^1].Return();
         }
 
-        public void Return(IMemoryValue value)
+        public void Return(AMemoryValue value)
         {
             if (m_FunctionsStack.Count > 0)
                 m_FunctionsStack[^1].Return(value);

@@ -8,6 +8,9 @@ namespace CorpseLib.Scripts.Instructions
     {
         private readonly AOperationTreeNode m_Operations = operations;
 
-        protected override void Execute(Environment env, Memory memory) => m_Operations.CallOperation(env, memory);
+        protected override void Execute(Environment env, Memory memory)
+        {
+            m_Operations.CallOperation(env, memory);
+        }
     }
 }

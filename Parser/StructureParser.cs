@@ -3,6 +3,7 @@ using CorpseLib.Scripts.Type;
 using static CorpseLib.Scripts.Parser.CommentAndTagParser;
 using System.Text;
 using CorpseLib.Scripts.Memories;
+using CorpseLib.Scripts.Parameters;
 
 namespace CorpseLib.Scripts.Parser
 {
@@ -92,54 +93,55 @@ namespace CorpseLib.Scripts.Parser
                 ObjectType structDefinition = new(realTypeInfo);
                 TypeDefinition typeDefinition = new(new Signature(parsingContext.Namespaces, realTypeInfo.ID), tupleResult.Result!.Item2);
                 parsingContext.PushTypeDefinition(typeDefinition, commentAndTags.Tags, commentAndTags.CommentIDs);
-                while (!string.IsNullOrEmpty(structContent))
                 {
-                    Tuple<string, string> structAttribute = ParserHelper.NextInstruction(structContent, out bool foundAttribute);
-                    if (!foundAttribute)
+                    while (!string.IsNullOrEmpty(structContent))
                     {
-                        parsingContext.RegisterError("Invalid script", $"Bad structure definition for {templateName}");
-                        return;
-                    }
-                    string attribute = structAttribute.Item1;
-                    CommentAndTags? attributeCommentAndTags = CommentAndTagParser.LoadCommentAndTags(ref attribute, parsingContext);
-                    if (parsingContext.HasErrors)
-                        return;
-                    string[] parameterParts = ParameterParser.SplitParameter(attribute, parsingContext);
-                    if (parsingContext.HasErrors)
-                        return;
-                    if (parameterParts.Length != 2 && parameterParts.Length != 3)
-                    {
-                        parsingContext.RegisterError("Invalid script", $"Bad structure definition for {templateName}");
-                        return;
-                    }
-                    OperationResult<TypeInfo> attributeTypeInfoResult = TypeInfo.ParseStr(parameterParts[0], parsingContext);
-                    if (!attributeTypeInfoResult)
-                    {
-                        parsingContext.RegisterError(attributeTypeInfoResult.Error, attributeTypeInfoResult.Description);
-                        return;
-                    }
-                    TypeInfo attributeTypeInfo = attributeTypeInfoResult.Result!;
-                    int nameID = parsingContext.PushName(parameterParts[1]);
-                    IMemoryValue? value = (parameterParts.Length == 3) ? ValueParser.ParseValue(parameterParts[2], parsingContext) : null;
-                    ParameterType? parameterType = parsingContext.Instantiate(attributeTypeInfo);
-                    if (parameterType != null)
-                    {
-                        if (parameterType.TypeID == 0)
+                        Tuple<string, string> structAttribute = ParserHelper.NextInstruction(structContent, out bool foundAttribute);
+                        if (!foundAttribute)
                         {
-                            parsingContext.RegisterError("Invalid script", "Parameter type cannot be void");
+                            parsingContext.RegisterError("Invalid script", $"Bad structure definition for {templateName}");
                             return;
                         }
-                        typeDefinition.AddAttribute(attributeTypeInfo, attributeCommentAndTags!.Tags, attributeCommentAndTags!.CommentIDs, nameID, value);
-                        if (value != null)
-                            structDefinition.AddAttribute(new Parameter(parameterType, nameID, value));
+                        string attribute = structAttribute.Item1;
+                        CommentAndTags? attributeCommentAndTags = CommentAndTagParser.LoadCommentAndTags(ref attribute, parsingContext);
+                        if (parsingContext.HasErrors)
+                            return;
+                        string[] parameterParts = ParameterParser.SplitParameter(attribute, parsingContext);
+                        if (parsingContext.HasErrors)
+                            return;
+                        if (parameterParts.Length != 2 && parameterParts.Length != 3)
+                        {
+                            parsingContext.RegisterError("Invalid script", $"Bad structure definition for {templateName}");
+                            return;
+                        }
+                        OperationResult<TypeInfo> attributeTypeInfoResult = TypeInfo.ParseStr(parameterParts[0], parsingContext);
+                        if (!attributeTypeInfoResult)
+                        {
+                            parsingContext.RegisterError(attributeTypeInfoResult.Error, attributeTypeInfoResult.Description);
+                            return;
+                        }
+                        TypeInfo attributeTypeInfo = attributeTypeInfoResult.Result!;
+                        int nameID = parsingContext.PushName(parameterParts[1]);
+                        ITemporaryValue? value = (parameterParts.Length == 3) ? ValueParser.ParseValue(parameterParts[2], parsingContext) : null;
+                        ParameterType? parameterType = parsingContext.Instantiate(attributeTypeInfo);
+                        if (parameterType != null)
+                        {
+                            if (parameterType.TypeID == 0)
+                            {
+                                parsingContext.RegisterError("Invalid script", "Parameter type cannot be void");
+                                return;
+                            }
+                            typeDefinition.AddAttribute(attributeTypeInfo, attributeCommentAndTags!.Tags, attributeCommentAndTags!.CommentIDs, nameID, value);
+                            if (value != null)
+                                structDefinition.AddAttribute(new Parameter(parameterType, nameID, value));
+                            else
+                                structDefinition.AddAttribute(new Parameter(parameterType, nameID, null));
+                        }
                         else
-                            structDefinition.AddAttribute(new Parameter(parameterType, nameID, null));
+                            typeDefinition.AddTemplateAttribute(attributeTypeInfo, attributeCommentAndTags!.Tags, attributeCommentAndTags!.CommentIDs, nameID, value);
+                        structContent = structAttribute.Item2;
                     }
-                    else
-                        typeDefinition.AddTemplateAttribute(attributeTypeInfo, attributeCommentAndTags!.Tags, attributeCommentAndTags!.CommentIDs, nameID, value);
-                    structContent = structAttribute.Item2;
                 }
-
                 if (typeDefinition.Templates.Length == 0)
                     parsingContext.PushType(structDefinition);
             }

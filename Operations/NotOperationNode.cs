@@ -8,10 +8,10 @@ namespace CorpseLib.Scripts.Operations
     {
         internal override bool IsBooleanOperation => true;
 
-        protected override IMemoryValue Execute(Environment env, Memory memory)
+        protected override AMemoryValue Execute(Environment env, Memory memory)
         {
-            IMemoryValue value = m_Children[0].CallOperation(env, memory);
-            return new LiteralValue(value is LiteralValue literalValue && !(bool)literalValue.Value);
+            AMemoryValue value = m_Children[0].CallOperation(env, memory);
+            return new MemoryLiteralValue(value is MemoryLiteralValue literalValue && !(bool)literalValue.Value);
         }
 
         protected override bool IsValid(ParsingContext parsingContext, string instructionStr)

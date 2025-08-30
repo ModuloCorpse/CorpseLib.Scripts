@@ -1,6 +1,7 @@
 ﻿using CorpseLib.Scripts.Instructions;
 using CorpseLib.Scripts.Memories;
 using CorpseLib.Scripts.Operations;
+using CorpseLib.Scripts.Parameters;
 using CorpseLib.Scripts.Parser.Instruction.Expressions;
 
 namespace CorpseLib.Scripts.Parser.Instruction
@@ -39,14 +40,14 @@ namespace CorpseLib.Scripts.Parser.Instruction
             return new(left);
         }
 
-        private static IMemoryValue ConvertAnonymousObject(AExpression expression)
+        private static ITemporaryValue ConvertAnonymousObject(AExpression expression)
         {
             if (expression is AnonymousObjectExpression anonymousObject)
             {
-                List<IMemoryValue> values = [];
+                List<ITemporaryValue> values = [];
                 foreach (AExpression parameter in anonymousObject.Parameters)
                     values.Add(ConvertAnonymousObject(parameter));
-                return anonymousObject.IsArray ? new ArrayValue([..values]) : new AnonymousObjectValue([..values]);
+                return anonymousObject.IsArray ? new TemporaryArrayValue([..values]) : new TemporaryObjectValue([..values]);
             }
             return (expression as LiteralExpression)!.Value;
         }
@@ -90,7 +91,7 @@ namespace CorpseLib.Scripts.Parser.Instruction
                 if (!operandResult)
                     return operandResult;
                 AExpression operand = operandResult.Result!;
-                if (isNegative && operand is LiteralExpression literal && literal.Value is LiteralValue)
+                if (isNegative && operand is LiteralExpression literal && literal.Value is MemoryLiteralValue)
                     return new(operand);
                 return new(new UnaryExpression(op, operand));
             }
@@ -327,6 +328,28 @@ namespace CorpseLib.Scripts.Parser.Instruction
         {
             if (expression is LiteralExpression literal)
                 return new LiteralOperationNode(literal.Value);
+            else if (expression is CreateVariableExpression createVariable)
+            {
+                ParameterType? parameterType = parsingContext.Instantiate(createVariable.TypeName);
+                if (parameterType == null)
+                {
+                    parsingContext.RegisterError("Unknown type", $"The type '{createVariable.TypeName}' is not valid.");
+                    return null;
+                }
+                CreateVariableOperationNode createVariableNode = new(parameterType, createVariable.VariableID);
+                if (createVariable.Value != null)
+                {
+                    AOperationTreeNode? valueNode = ConvertExpressions(createVariable.Value, parsingContext);
+                    if (valueNode == null)
+                    {
+                        parsingContext.RegisterError("Invalid value", $"The value for variable '{parsingContext.ConversionTable.GetName(createVariable.VariableID)}' is invalid.");
+                        return null;
+                    }
+                    createVariableNode.AddChild(valueNode);
+                }
+                //TODO Add variable to test environment
+                return createVariableNode;
+            }
             return null;
         }
 

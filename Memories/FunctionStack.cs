@@ -4,10 +4,10 @@ namespace CorpseLib.Scripts.Memories
     public class FunctionStack
     {
         private FunctionStackScope m_VariableScope = new();
-        private IMemoryValue? m_ReturnValue = null;
+        private AMemoryValue? m_ReturnValue = null;
         private bool m_HasReturn = false;
 
-        public IMemoryValue? ReturnValue => m_ReturnValue;
+        public AMemoryValue? ReturnValue => m_ReturnValue;
         public bool HasReturn => m_HasReturn;
 
         public StackVariable[] AllVariables => m_VariableScope.AllVariables;
@@ -31,7 +31,7 @@ namespace CorpseLib.Scripts.Memories
 
         public void Return() => m_HasReturn = true;
 
-        public void Return(IMemoryValue value)
+        public void Return(AMemoryValue value)
         {
             m_HasReturn = true;
             m_ReturnValue = value;

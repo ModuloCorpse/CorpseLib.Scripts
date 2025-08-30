@@ -1,4 +1,5 @@
 ﻿using CorpseLib.Scripts.Memories;
+using CorpseLib.Scripts.Parameters;
 using System.Text;
 
 namespace CorpseLib.Scripts.Parser
@@ -104,10 +105,10 @@ namespace CorpseLib.Scripts.Parser
             return new(str, string.Empty);
         }
 
-        public static IMemoryValue ParseValue(string str, ParsingContext parsingContext)
+        public static ITemporaryValue ParseValue(string str, ParsingContext parsingContext)
         {
             if (str == "null")
-                return Heap.NULL;
+                return new TemporaryNullValue();
             if (str.Length > 2 && str[0] == '{' && str[^1] == '}')
             {
                 str = str[1..^1];
@@ -115,7 +116,7 @@ namespace CorpseLib.Scripts.Parser
                     str = str[..^1];
                 if (str.Length > 0 && str[0] == ' ')
                     str = str[1..];
-                List<IMemoryValue> variables = [];
+                List<ITemporaryValue> variables = [];
                 while (!string.IsNullOrEmpty(str))
                 {
                     if (str[0] == '[')
@@ -143,7 +144,7 @@ namespace CorpseLib.Scripts.Parser
                         str = split.Item2;
                     }
                 }
-                return new AnonymousObjectValue([.. variables]);
+                return new TemporaryObjectValue([.. variables]);
             }
             else if (str.Length > 2 && str[0] == '[' && str[^1] == ']')
             {
@@ -152,7 +153,7 @@ namespace CorpseLib.Scripts.Parser
                     str = str[..^1];
                 if (str.Length > 0 && str[0] == ' ')
                     str = str[1..];
-                List<IMemoryValue> variables = [];
+                List<ITemporaryValue> variables = [];
                 while (!string.IsNullOrEmpty(str))
                 {
                     if (str[0] == '[')
@@ -180,28 +181,28 @@ namespace CorpseLib.Scripts.Parser
                         str = split.Item2;
                     }
                 }
-                return new ArrayValue([.. variables]);
+                return new TemporaryArrayValue([.. variables]);
             }
             else if (str.Length > 2 && str[0] == '"' && str[^1] == '"')
-                return new StringValue(str[1..^1]);
+                return new TemporaryStringValue(str[1..^1]);
             else if (str.Length > 2 && str[0] == '\'' && str[^1] == '\'')
             {
                 if (str.Length == 3)
-                    return new LiteralValue(str[1]);
+                    return new TemporaryLiteralValue(str[1]);
                 else if (str.Length == 4 && str[1] == '\\')
-                    return new LiteralValue(str[2]);
+                    return new TemporaryLiteralValue(str[2]);
                 else
                 {
                     parsingContext.RegisterWarning("Wrong delimiter for string", $"String delimited with char delimiter : {str}");
-                    return new StringValue(str[1..^1]);
+                    return new TemporaryStringValue(str[1..^1]);
                 }
             }
             else
             {
                 if (str == "true")
-                    return new LiteralValue(true);
+                    return new TemporaryLiteralValue(true);
                 else if (str == "false")
-                    return new LiteralValue(false);
+                    return new TemporaryLiteralValue(false);
                 else if (str.Contains('.'))
                 {
                     if (str.Length > 2 && str[0] == '-' && str[1] == '.')
@@ -213,12 +214,12 @@ namespace CorpseLib.Scripts.Parser
                     if (double.TryParse(str, out double value))
                     {
                         if (value >= float.MinValue && value <= float.MaxValue)
-                            return new LiteralValue((float)value);
+                            return new TemporaryLiteralValue((float)value);
                         else
-                            return new LiteralValue(value);
+                            return new TemporaryLiteralValue(value);
                     }
                     parsingContext.RegisterError("Invalid script", $"Cannot parse float value : {str}");
-                    return Heap.NULL;
+                    return new TemporaryNullValue();
                 }
                 else
                 {
@@ -227,13 +228,13 @@ namespace CorpseLib.Scripts.Parser
                         if (long.TryParse(str, out long value))
                         {
                             if (value >= sbyte.MinValue && value <= sbyte.MaxValue)
-                                return new LiteralValue((sbyte)value);
+                                return new TemporaryLiteralValue((sbyte)value);
                             else if (value >= short.MinValue && value <= short.MaxValue)
-                                return new LiteralValue((short)value);
+                                return new TemporaryLiteralValue((short)value);
                             else if (value >= int.MinValue && value <= int.MaxValue)
-                                return new LiteralValue((int)value);
+                                return new TemporaryLiteralValue((int)value);
                             else
-                                return new LiteralValue(value);
+                                return new TemporaryLiteralValue(value);
                         }
                     }
                     else
@@ -241,18 +242,18 @@ namespace CorpseLib.Scripts.Parser
                         if (ulong.TryParse(str, out ulong value))
                         {
                             if (value >= byte.MinValue && value <= byte.MaxValue)
-                                return new LiteralValue((byte)value);
+                                return new TemporaryLiteralValue((byte)value);
                             else if (value >= ushort.MinValue && value <= ushort.MaxValue)
-                                return new LiteralValue((ushort)value);
+                                return new TemporaryLiteralValue((ushort)value);
                             else if (value >= uint.MinValue && value <= uint.MaxValue)
-                                return new LiteralValue((uint)value);
+                                return new TemporaryLiteralValue((uint)value);
                             else
-                                return new LiteralValue(value);
+                                return new TemporaryLiteralValue(value);
                         }
                     }
                 }
             }
-            return new StringValue(str); //We consider it a string not delimited as some split can remove " from strings
+            return new TemporaryStringValue(str); //We consider it a string not delimited as some split can remove " from strings
         }
     }
 }

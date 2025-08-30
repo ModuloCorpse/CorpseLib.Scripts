@@ -1,4 +1,6 @@
-﻿namespace CorpseLib.Scripts.Type
+﻿using CorpseLib.Scripts.Parameters;
+
+namespace CorpseLib.Scripts.Type
 {
     public class ObjectType(TypeInfo typeInfo) : ATypeInstance(typeInfo, false)
     {

@@ -1,5 +1,6 @@
 ﻿using CorpseLib.Scripts.Context;
 using CorpseLib.Scripts.Instructions;
+using CorpseLib.Scripts.Parameters;
 using CorpseLib.Scripts.Type;
 using Environment = CorpseLib.Scripts.Context.Environment;
 

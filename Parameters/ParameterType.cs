@@ -1,4 +1,4 @@
-﻿namespace CorpseLib.Scripts
+﻿namespace CorpseLib.Scripts.Parameters
 {
     public class ParameterType(int type, bool isStatic, bool isConst, bool isRef, int arrayCount)
     {

@@ -1,17 +1,17 @@
-﻿using CorpseLib.Scripts.Memories;
+﻿using CorpseLib.Scripts.Parameters;
 
 namespace CorpseLib.Scripts.Parser.Instruction.Expressions
 {
-    public class LiteralExpression(IMemoryValue value) : AExpression(false)
+    public class LiteralExpression(ITemporaryValue value) : AExpression(false)
     {
-        public IMemoryValue Value = value;
+        public ITemporaryValue Value = value;
 
         internal override void Dump(ConversionTable conversionTable, string str)
         {
             Console.Write(str);
             Console.Write("- Literal: ");
             ScriptBuilder sb = new(conversionTable);
-            ScriptWriter.AppendMemoryValue(sb, Value);
+            ScriptWriter.AppendParameterValue(sb, Value);
             Console.WriteLine(sb.ToString());
         }
     }
